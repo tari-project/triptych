@@ -1,0 +1,30 @@
+[package]
+name = "triptych"
+version = "0.1.0"
+authors = ["The Tari Project"]
+edition = "2021"
+description = "An experimental Rust implementation of the Triptych zero-knowledge proving system"
+readme = "README.md"
+license = "BSD-3-Clause"
+categories = ["cryptography"]
+
+[dependencies]
+blake3 = { version = "1.5.0", default-features = false }
+curve25519-dalek = { version = "4.1.1", default-features = false, features = ["alloc", "digest", "rand_core", "zeroize"] }
+merlin = { version = "3.0.0", default-features = false }
+rand_core = { version = "0.6.4", default-features = false }
+serde = { version = "1.0.193", optional = true, default-features = false, features = ["alloc", "derive"] }
+snafu = { version = "0.7.5", default-features = false }
+zeroize = { version = "1.7.0", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+criterion = { version = "0.5.1", default-features = false, features = ["cargo_bench_support"] }
+rand = { version = "0.8.5", default-features = false, features = ["getrandom"] }
+rand_chacha = { version = "0.3.1", default-features = false }
+
+[features]
+serde = ["dep:serde", "curve25519-dalek/serde"]
+
+[[bench]]
+name = "triptych"
+harness = false
