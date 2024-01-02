@@ -64,10 +64,13 @@ struct Weights {
 impl Weights {
     /// Generate a set of weights from a proof.
     #[allow(non_snake_case)]
-    fn from_proof(proof: &Proof) -> Self {
-        // Hash the proof elements
+    fn generate(statement: &Statement, proof: &Proof) -> Self {
+        // Hash the parameteres, statement, and proof elements
         let mut hasher = Hasher::new();
         hasher.update("Triptych Weights".as_bytes());
+        hasher.update(statement.get_params().get_hash());
+        hasher.update(statement.get_input_set().get_hash());
+        hasher.update(statement.get_J().compress().as_bytes());
         hasher.update(proof.A.compress().as_bytes());
         hasher.update(proof.B.compress().as_bytes());
         hasher.update(proof.C.compress().as_bytes());
@@ -401,7 +404,7 @@ impl Proof {
             .collect::<Vec<Vec<Scalar>>>();
 
         // Generate weights for verification equations
-        let weights = Weights::from_proof(self);
+        let weights = Weights::generate(statement, self);
         let w1 = weights.w1;
         let w2 = weights.w2;
         let w4 = weights.w4;
