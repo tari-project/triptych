@@ -131,12 +131,19 @@ impl Proof {
         transcript.append_message("M".as_bytes(), statement.get_input_set().get_hash());
         transcript.append_message("J".as_bytes(), J.compress().as_bytes());
 
+        // Construct a random number generator at the current transcript state
+        let mut transcript_rng = transcript
+            .build_rng()
+            .rekey_with_witness_bytes("l".as_bytes(), &l.to_le_bytes())
+            .rekey_with_witness_bytes("r".as_bytes(), r.as_bytes())
+            .finalize(rng);
+
         // Compute the `A` matrix commitment
-        let r_A = Scalar::random(rng);
+        let r_A = Scalar::random(&mut transcript_rng);
         let mut a = (0..params.get_m())
             .map(|_| {
                 (0..params.get_n())
-                    .map(|_| Scalar::random(rng))
+                    .map(|_| Scalar::random(&mut transcript_rng))
                     .collect::<Vec<Scalar>>()
             })
             .collect::<Vec<Vec<Scalar>>>();
@@ -148,7 +155,7 @@ impl Proof {
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `B` matrix commitment
-        let r_B = Scalar::random(rng);
+        let r_B = Scalar::random(&mut transcript_rng);
         let l_decomposed = params.decompose(l).map_err(|_| ProofError::InvalidParameter)?;
         let sigma = (0..params.get_m())
             .map(|j| {
@@ -163,7 +170,7 @@ impl Proof {
 
         // Compute the `C` matrix commitment
         let two = Scalar::from(2u32);
-        let r_C = Scalar::random(rng);
+        let r_C = Scalar::random(&mut transcript_rng);
         let a_sigma = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
@@ -176,7 +183,7 @@ impl Proof {
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `D` matrix commitment
-        let r_D = Scalar::random(rng);
+        let r_D = Scalar::random(&mut transcript_rng);
         let a_square = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
@@ -191,7 +198,7 @@ impl Proof {
         // Random masks
         let rho = Zeroizing::new(
             (0..params.get_m())
-                .map(|_| Scalar::random(rng))
+                .map(|_| Scalar::random(&mut transcript_rng))
                 .collect::<Vec<Scalar>>(),
         );
 
