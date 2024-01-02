@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::iter::once;
 
 use curve25519_dalek::{
-    traits::{Identity, VartimeMultiscalarMul},
+    traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
     RistrettoPoint,
     Scalar,
 };
@@ -235,15 +235,16 @@ impl Proof {
         }
 
         // Compute `X` vector
-        let mut X = rho
+        let X = rho
             .iter()
-            .map(|rho| rho * params.get_G())
+            .enumerate()
+            .map(|(j, rho)| {
+                let X_points = M.iter().chain(once(params.get_G()));
+                let X_scalars = p.iter().map(|p| &p[j]).chain(once(rho));
+
+                RistrettoPoint::multiscalar_mul(X_scalars, X_points)
+            })
             .collect::<Vec<RistrettoPoint>>();
-        for j in 0..params.get_m() {
-            for k in 0..params.get_N() {
-                X[j as usize] += p[k as usize][j as usize] * M[k as usize];
-            }
-        }
 
         // Compute `Y` vector
         let Y = rho.iter().map(|rho| rho * J).collect::<Vec<RistrettoPoint>>();
