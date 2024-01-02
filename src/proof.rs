@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use snafu::prelude::*;
 use zeroize::Zeroizing;
 
-use crate::{statement::Statement, witness::Witness};
+use crate::{statement::Statement, util::DangerousRng, witness::Witness};
 
 // Proof version flag
 const VERSION: u64 = 0;
@@ -94,8 +94,7 @@ impl Proof {
     ///
     /// You may optionally provide a byte slice `message` that is bound to the proof's Fiat-Shamir transcript.
     /// The verifier must provide the same message in order for the proof to verify.
-    #[allow(non_snake_case)]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, non_snake_case)]
     pub fn prove<R: CryptoRngCore>(
         witness: &Witness,
         statement: &Statement,
@@ -301,12 +300,9 @@ impl Proof {
     /// Verification requires that the statement `statement` and optional byte slice `message` match those used when the
     /// proof was generated.
     ///
-    /// You must also supply a cryptographically-secure random number generator `rng` that is used internally for
-    /// efficiency.
-    ///
     /// Returns a boolean that is `true` if and only if the proof is valid.
     #[allow(non_snake_case)]
-    pub fn verify<R: CryptoRngCore>(&self, statement: &Statement, message: Option<&[u8]>, rng: &mut R) -> bool {
+    pub fn verify(&self, statement: &Statement, message: Option<&[u8]>) -> bool {
         // Extract statement values for convenience
         let M = statement.get_input_set().get_keys();
         let params = statement.get_params();
@@ -341,6 +337,17 @@ impl Proof {
             },
         };
 
+        // Finish the transcript for pseudorandom number generation
+        for f_row in &self.f {
+            for f in f_row {
+                transcript.append_message("f".as_bytes(), f.as_bytes());
+            }
+        }
+        transcript.append_message("z_A".as_bytes(), self.z_A.as_bytes());
+        transcript.append_message("z_C".as_bytes(), self.z_C.as_bytes());
+        transcript.append_message("z".as_bytes(), self.z.as_bytes());
+        let mut transcript_rng = transcript.build_rng().finalize(&mut DangerousRng);
+
         // Reconstruct the remaining `f` terms
         let f = (0..params.get_m())
             .map(|j| {
@@ -353,9 +360,9 @@ impl Proof {
 
         // Generate weights for verification equations
         // We implicitly set `w3 = 1` to avoid unnecessary constant-time multiplication
-        let w1 = Scalar::random(rng);
-        let w2 = Scalar::random(rng);
-        let w4 = Scalar::random(rng);
+        let w1 = Scalar::random(&mut transcript_rng);
+        let w2 = Scalar::random(&mut transcript_rng);
+        let w4 = Scalar::random(&mut transcript_rng);
 
         // Set up the point iterator for the final check
         let points = once(params.get_G())
@@ -480,8 +487,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    #[allow(non_upper_case_globals)]
+    #[allow(non_snake_case, non_upper_case_globals)]
     fn test_prove_verify() {
         // Generate data
         const n: u32 = 2;
@@ -492,12 +498,11 @@ mod test {
         // Generate and verify a proof
         let message = "Proof messsage".as_bytes();
         let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
-        assert!(proof.verify(&statement, Some(message), &mut rng));
+        assert!(proof.verify(&statement, Some(message)));
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    #[allow(non_upper_case_globals)]
+    #[allow(non_snake_case, non_upper_case_globals)]
     fn test_evil_message() {
         // Generate data
         const n: u32 = 2;
@@ -511,12 +516,11 @@ mod test {
 
         // Attempt to verify the proof against a different message, which should fail
         let evil_message = "Evil proof message".as_bytes();
-        assert!(!proof.verify(&statement, Some(evil_message), &mut rng));
+        assert!(!proof.verify(&statement, Some(evil_message)));
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    #[allow(non_upper_case_globals)]
+    #[allow(non_snake_case, non_upper_case_globals)]
     fn test_evil_input_set() {
         // Generate data
         const n: u32 = 2;
@@ -536,12 +540,11 @@ mod test {
         let evil_statement = Statement::new(statement.get_params(), &evil_input_set, statement.get_J()).unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message), &mut rng));
+        assert!(!proof.verify(&evil_statement, Some(message)));
     }
 
     #[test]
-    #[allow(non_snake_case)]
-    #[allow(non_upper_case_globals)]
+    #[allow(non_snake_case, non_upper_case_globals)]
     fn test_evil_linking_tag() {
         // Generate data
         const n: u32 = 2;
@@ -562,6 +565,6 @@ mod test {
         .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message), &mut rng));
+        assert!(!proof.verify(&evil_statement, Some(message)));
     }
 }
