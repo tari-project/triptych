@@ -4,6 +4,7 @@
 use alloc::vec::Vec;
 use core::iter::once;
 
+use blake3::Hasher;
 use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
     RistrettoPoint,
@@ -47,6 +48,58 @@ pub enum ProofError {
     /// A transcript challenge was invalid.
     #[snafu(display("A transcript challenge was invalid"))]
     InvalidChallenge,
+}
+
+/// Verifier equation weights.
+///
+/// Each of the four verification equations requires a nonzero weight chosen by the verifier.
+/// Because the verifier may not have access to a random number generator, we hash the proof elements.
+/// One of the equations (the third) has its weight implicitly set to 1 for efficiency purposes.
+struct Weights {
+    w1: Scalar,
+    w2: Scalar,
+    w4: Scalar,
+}
+
+impl Weights {
+    /// Generate a set of weights from a proof.
+    #[allow(non_snake_case)]
+    fn from_proof(proof: &Proof) -> Self {
+        // Hash the proof elements
+        let mut hasher = Hasher::new();
+        hasher.update("Triptych Weights".as_bytes());
+        hasher.update(proof.A.compress().as_bytes());
+        hasher.update(proof.B.compress().as_bytes());
+        hasher.update(proof.C.compress().as_bytes());
+        hasher.update(proof.D.compress().as_bytes());
+        for X in &proof.X {
+            hasher.update(X.compress().as_bytes());
+        }
+        for Y in &proof.Y {
+            hasher.update(Y.compress().as_bytes());
+        }
+        for f in proof.f.iter().flatten() {
+            hasher.update(f.as_bytes());
+        }
+        hasher.update(proof.z_A.as_bytes());
+        hasher.update(proof.z_C.as_bytes());
+        hasher.update(proof.z.as_bytes());
+
+        // Generate the weights using XOF
+        let mut w1 = [0u8; 64];
+        let mut w2 = [0u8; 64];
+        let mut w4 = [0u8; 64];
+        let mut hasher_xof = hasher.finalize_xof();
+        hasher_xof.fill(&mut w1);
+        hasher_xof.fill(&mut w2);
+        hasher_xof.fill(&mut w4);
+
+        Self {
+            w1: Scalar::from_bytes_mod_order_wide(&w1),
+            w2: Scalar::from_bytes_mod_order_wide(&w2),
+            w4: Scalar::from_bytes_mod_order_wide(&w4),
+        }
+    }
 }
 
 /// Kronecker delta function with scalar output.
@@ -300,12 +353,9 @@ impl Proof {
     /// Verification requires that the statement `statement` and optional byte slice `message` match those used when the
     /// proof was generated.
     ///
-    /// You must also supply a cryptographically-secure random number generator `rng` that is used internally for
-    /// efficiency.
-    ///
     /// Returns a boolean that is `true` if and only if the proof is valid.
     #[allow(non_snake_case)]
-    pub fn verify<R: CryptoRngCore>(&self, statement: &Statement, message: Option<&[u8]>, rng: &mut R) -> bool {
+    pub fn verify(&self, statement: &Statement, message: Option<&[u8]>) -> bool {
         // Extract statement values for convenience
         let M = statement.get_input_set().get_keys();
         let params = statement.get_params();
@@ -351,10 +401,10 @@ impl Proof {
             .collect::<Vec<Vec<Scalar>>>();
 
         // Generate weights for verification equations
-        // We implicitly set `w3 = 1` to avoid unnecessary constant-time multiplication
-        let w1 = Scalar::random(rng);
-        let w2 = Scalar::random(rng);
-        let w4 = Scalar::random(rng);
+        let weights = Weights::from_proof(self);
+        let w1 = weights.w1;
+        let w2 = weights.w2;
+        let w4 = weights.w4;
 
         // Set up the point iterator for the final check
         let points = once(params.get_G())
@@ -491,7 +541,7 @@ mod test {
         // Generate and verify a proof
         let message = "Proof messsage".as_bytes();
         let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
-        assert!(proof.verify(&statement, Some(message), &mut rng));
+        assert!(proof.verify(&statement, Some(message)));
     }
 
     #[test]
@@ -510,7 +560,7 @@ mod test {
 
         // Attempt to verify the proof against a different message, which should fail
         let evil_message = "Evil proof message".as_bytes();
-        assert!(!proof.verify(&statement, Some(evil_message), &mut rng));
+        assert!(!proof.verify(&statement, Some(evil_message)));
     }
 
     #[test]
@@ -535,7 +585,7 @@ mod test {
         let evil_statement = Statement::new(statement.get_params(), &evil_input_set, statement.get_J()).unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message), &mut rng));
+        assert!(!proof.verify(&evil_statement, Some(message)));
     }
 
     #[test]
@@ -561,6 +611,6 @@ mod test {
         .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message), &mut rng));
+        assert!(!proof.verify(&evil_statement, Some(message)));
     }
 }

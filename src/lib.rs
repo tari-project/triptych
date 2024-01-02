@@ -98,11 +98,11 @@
 //! let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
 //!
 //! // The proof should verify against the statement and message
-//! assert!(proof.verify(&statement, Some(message), &mut rng));
+//! assert!(proof.verify(&statement, Some(message)));
 //!
 //! // The proof should not verify against a different message
 //! let evil_message = "Pure evil".as_bytes();
-//! assert!(!proof.verify(&statement, Some(evil_message), &mut rng));
+//! assert!(!proof.verify(&statement, Some(evil_message)));
 //! ```
 
 #![no_std]

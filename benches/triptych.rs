@@ -105,7 +105,7 @@ fn verify_proof(c: &mut Criterion) {
 
                 // Start the benchmark
                 b.iter(|| {
-                    assert!(proof.verify(&statement, Some(message), &mut rng));
+                    assert!(proof.verify(&statement, Some(message)));
                 })
             });
         }
