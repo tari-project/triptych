@@ -1,7 +1,7 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::iter::once;
 
 use curve25519_dalek::{
@@ -17,7 +17,7 @@ use snafu::prelude::*;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
-use crate::{statement::Statement, util::DangerousRng, witness::Witness};
+use crate::{gray::GrayIterator, statement::Statement, util::DangerousRng, witness::Witness};
 
 // Proof version flag
 const VERSION: u64 = 0;
@@ -155,7 +155,8 @@ impl Proof {
 
         // Compute the `B` matrix commitment
         let r_B = Scalar::random(&mut transcript_rng);
-        let l_decomposed = params.decompose(l).map_err(|_| ProofError::InvalidParameter)?;
+        let l_decomposed =
+            GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?;
         let sigma = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
@@ -203,8 +204,11 @@ impl Proof {
 
         // Compute `p` polynomial vector coefficients using repeated convolution
         let mut p = Vec::<Vec<Scalar>>::with_capacity(params.get_N() as usize);
-        for k in 0..params.get_N() {
-            let k_decomposed = params.decompose(k).map_err(|_| ProofError::InvalidParameter)?;
+        let mut k_decomposed = vec![0; params.get_m() as usize];
+        for (gray_index, _, gray_new) in
+            GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?
+        {
+            k_decomposed[gray_index] = gray_new;
 
             // Set the initial coefficients using the first degree-one polynomial (`j = 0`)
             let mut coefficients = Vec::new();
@@ -380,6 +384,13 @@ impl Proof {
             })
             .collect::<Vec<Vec<Scalar>>>();
 
+        // Check that `f` does not contain zero, which breaks batch inversion
+        for f_row in &f {
+            if f_row.contains(&Scalar::ZERO) {
+                return false;
+            }
+        }
+
         // Generate weights for verification equations
         // We implicitly set `w3 = 1` to avoid unnecessary constant-time multiplication
         let w1 = Scalar::random(&mut transcript_rng);
@@ -443,15 +454,25 @@ impl Proof {
             scalars.push(-w4 * xi_power);
         }
 
+        // Set up the initial `f` product and Gray iterator
+        let mut f_product = f.iter().map(|f_row| f_row[0]).product::<Scalar>();
+        let gray_iterator = if let Some(gray_iterator) = GrayIterator::new(params.get_n(), params.get_m()) {
+            gray_iterator
+        } else {
+            return false;
+        };
+
+        // Invert each element of `f` for efficiency
+        let mut f_inverse_flat = f.iter().flatten().copied().collect::<Vec<Scalar>>();
+        Scalar::batch_invert(&mut f_inverse_flat);
+        let f_inverse = f_inverse_flat
+            .chunks_exact(params.get_n() as usize)
+            .collect::<Vec<&[Scalar]>>();
+
         // M
-        for k in 0..params.get_N() {
-            let k_decomposed = match params.decompose(k) {
-                Ok(k_decomposed) => k_decomposed,
-                _ => return false,
-            };
-            let f_product = (0..params.get_m())
-                .map(|j| f[j as usize][k_decomposed[j as usize] as usize])
-                .product::<Scalar>();
+        for (gray_index, gray_old, gray_new) in gray_iterator {
+            // Update the `f` product
+            f_product *= f_inverse[gray_index][gray_old as usize] * f[gray_index][gray_new as usize];
 
             scalars.push(f_product);
             U_scalar += f_product;

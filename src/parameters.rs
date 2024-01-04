@@ -143,24 +143,6 @@ impl Parameters {
         Ok(RistrettoPoint::multiscalar_mul(scalars, points))
     }
 
-    /// Decompose a value with base `n` and padded length `m`.
-    ///
-    /// You must supply `x` that is valid for these bounds.
-    pub(crate) fn decompose(&self, mut x: u32) -> Result<Vec<u32>, ParameterError> {
-        if x >= self.get_N() {
-            return Err(ParameterError::InvalidParameter);
-        }
-
-        let mut result = Vec::<u32>::with_capacity(self.m as usize);
-
-        for _ in 0..self.m {
-            result.push(x % self.n);
-            x /= self.n;
-        }
-
-        Ok(result)
-    }
-
     /// Get the group generator `G` from these parameters.
     ///
     /// This is the generator used for defining verification keys.
