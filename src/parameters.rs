@@ -5,7 +5,12 @@ use alloc::vec::Vec;
 use core::iter::once;
 
 use blake3::Hasher;
-use curve25519_dalek::{constants::RISTRETTO_BASEPOINT_POINT, traits::MultiscalarMul, RistrettoPoint, Scalar};
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_POINT,
+    traits::{MultiscalarMul, VartimeMultiscalarMul},
+    RistrettoPoint,
+    Scalar,
+};
 use snafu::prelude::*;
 
 /// Public parameters used for generating and verifying Triptych proofs.
@@ -126,10 +131,12 @@ impl Parameters {
     /// Commit to a matrix.
     ///
     /// This requires that `matrix` be an `m x n` scalar matrix.
+    /// You can decide if you want to use variable-time operations via the `vartime` flag.
     pub(crate) fn commit_matrix(
         &self,
         matrix: &[Vec<Scalar>],
         mask: &Scalar,
+        vartime: bool,
     ) -> Result<RistrettoPoint, ParameterError> {
         // Check that the matrix dimensions are valid
         if matrix.len() != (self.m as usize) || matrix.iter().any(|m| m.len() != (self.n as usize)) {
@@ -140,7 +147,11 @@ impl Parameters {
         let scalars = matrix.iter().flatten().chain(once(mask)).collect::<Vec<&Scalar>>();
         let points = self.get_CommitmentG().iter().chain(once(self.get_CommitmentH()));
 
-        Ok(RistrettoPoint::multiscalar_mul(scalars, points))
+        if vartime {
+            Ok(RistrettoPoint::vartime_multiscalar_mul(scalars, points))
+        } else {
+            Ok(RistrettoPoint::multiscalar_mul(scalars, points))
+        }
     }
 
     /// Get the group generator `G` from these parameters.

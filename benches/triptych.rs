@@ -70,6 +70,55 @@ fn generate_proof(c: &mut Criterion) {
 
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
+fn generate_proof_vartime(c: &mut Criterion) {
+    let mut group = c.benchmark_group("generate_proof_vartime");
+    let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+
+    for n in N_VALUES {
+        for m in M_VALUES {
+            // Generate parameters
+            let params = Arc::new(Parameters::new(n, m).unwrap());
+
+            let label = format!(
+                "Generate proof (variable time): n = {}, m = {} (N = {})",
+                n,
+                m,
+                params.get_N()
+            );
+            group.bench_function(&label, |b| {
+                // Generate witness
+                let witness = Witness::random(&params, &mut rng);
+
+                // Generate input set
+                let M = (0..params.get_N())
+                    .map(|i| {
+                        if i == witness.get_l() {
+                            witness.compute_verification_key()
+                        } else {
+                            RistrettoPoint::random(&mut rng)
+                        }
+                    })
+                    .collect::<Vec<RistrettoPoint>>();
+                let input_set = Arc::new(InputSet::new(&M));
+
+                // Generate statement
+                let J = witness.compute_linking_tag();
+                let statement = Statement::new(&params, &input_set, &J).unwrap();
+
+                // Start the benchmark
+                b.iter(|| {
+                    // Generate the proof
+                    let _proof =
+                        Proof::prove_vartime(&witness, &statement, Some("Proof message".as_bytes()), &mut rng).unwrap();
+                })
+            });
+        }
+    }
+    group.finish();
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
 fn verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify_proof");
     let mut rng = ChaCha12Rng::seed_from_u64(8675309);
@@ -116,7 +165,7 @@ fn verify_proof(c: &mut Criterion) {
 criterion_group! {
     name = generate;
     config = Criterion::default();
-    targets = generate_proof
+    targets = generate_proof, generate_proof_vartime
 }
 
 criterion_group! {
