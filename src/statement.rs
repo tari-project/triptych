@@ -4,7 +4,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use blake3::Hasher;
-use curve25519_dalek::RistrettoPoint;
+use curve25519_dalek::{traits::Identity, RistrettoPoint};
 use snafu::prelude::*;
 
 use crate::parameters::Parameters;
@@ -72,7 +72,8 @@ impl Statement {
     /// Generate a new Triptych proof statement.
     ///
     /// The input set `input_set` must have a verification key vector whose size matches that specified by the
-    /// parameters `params`. If this condition is not met, returns an error.
+    /// parameters `params`, and which does not contain the identity group element.
+    /// If either of these conditions is not met, returns an error.
     ///
     /// The linking tag `J` is assumed to have been computed from witness data or otherwise provided externally.
     #[allow(non_snake_case)]
@@ -83,6 +84,9 @@ impl Statement {
     ) -> Result<Self, StatementError> {
         // Check that the input vector is valid against the parameters
         if input_set.get_keys().len() != params.get_N() as usize {
+            return Err(StatementError::InvalidParameter);
+        }
+        if input_set.get_keys().contains(&RistrettoPoint::identity()) {
             return Err(StatementError::InvalidParameter);
         }
 
