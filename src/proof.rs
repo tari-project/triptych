@@ -14,6 +14,7 @@ use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use snafu::prelude::*;
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
 use crate::{statement::Statement, util::DangerousRng, witness::Witness};
@@ -49,13 +50,11 @@ pub enum ProofError {
     InvalidChallenge,
 }
 
-/// Kronecker delta function with scalar output.
+/// Constant-time Kronecker delta function with scalar output.
 fn delta(x: u32, y: u32) -> Scalar {
-    if x == y {
-        Scalar::ONE
-    } else {
-        Scalar::ZERO
-    }
+    let mut result = Scalar::ZERO;
+    result.conditional_assign(&Scalar::ONE, x.ct_eq(&y));
+    result
 }
 
 /// Get nonzero powers of a challenge value from a transcript.
