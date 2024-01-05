@@ -308,12 +308,28 @@ impl Proof {
     /// proof was generated.
     ///
     /// Returns a boolean that is `true` if and only if the proof is valid.
-    #[allow(non_snake_case)]
+    #[allow(clippy::too_many_lines, non_snake_case)]
     pub fn verify(&self, statement: &Statement, message: Option<&[u8]>) -> bool {
         // Extract statement values for convenience
         let M = statement.get_input_set().get_keys();
         let params = statement.get_params();
         let J = statement.get_J();
+
+        // Check that the proof semantics are valid for the statement
+        if self.X.len() != params.get_m() as usize {
+            return false;
+        }
+        if self.Y.len() != params.get_m() as usize {
+            return false;
+        }
+        if self.f.len() != params.get_m() as usize {
+            return false;
+        }
+        for f_row in &self.f {
+            if f_row.len() != (params.get_n() - 1) as usize {
+                return false;
+            }
+        }
 
         // Generate the verifier challenge
         let mut transcript = Transcript::new("Triptych proof".as_bytes());
