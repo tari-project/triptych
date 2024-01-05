@@ -110,6 +110,8 @@
 
 extern crate alloc;
 
+/// Iterated arbitrary-base Gray code functionaity.
+pub mod gray;
 /// Public parameters used for generating and verifying Triptych proofs.
 pub mod parameters;
 /// Triptych proofs.
