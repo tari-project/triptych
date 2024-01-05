@@ -25,7 +25,7 @@ rand_chacha = { version = "0.3.1", default-features = false }
 
 [features]
 serde = ["dep:serde", "curve25519-dalek/serde", "zeroize/serde"]
-std = ["blake3/std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "zeroize/std"]
+std = ["blake3/std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "subtle/std", "zeroize/std"]
 
 [[bench]]
 name = "triptych"
