@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use rand_core::CryptoRngCore;
 use snafu::prelude::*;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::parameters::Parameters;
 
@@ -88,8 +88,9 @@ impl Witness {
     }
 
     /// Compute the linking tag for the witness signing key.
+    #[allow(non_snake_case)]
     pub fn compute_linking_tag(&self) -> RistrettoPoint {
-        self.r.invert() * self.params.get_U()
+        *Zeroizing::new(self.r.invert()) * self.params.get_U()
     }
 
     /// Compute the verification key for the witness signing key.
