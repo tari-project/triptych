@@ -33,6 +33,7 @@
 //!
 //! The implementation keeps dependencies to a minimum, and is `no_std` right out of the box.
 //! You can enable the optional `serde` feature for proof (de)serialization support.
+//! You can enable the optional `std` feature for corresponding dependency features.
 //!
 //! # Security
 //!
