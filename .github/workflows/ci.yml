@@ -1,0 +1,48 @@
+on: [pull_request]
+name: CI
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Format
+        run: cargo fmt --all -- --check
+  lints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install linter
+        run: cargo install cargo-lints
+      - name: Lints
+        run: cargo lints clippy --all-targets --all-features
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check (no features)
+        run: cargo check --all-targets
+      - name: Check (features)
+        run: cargo check --all-targets --all-features
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Docs
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test (debug)
+        run: cargo test --all-features
+      - name: Test (release)
+        run: cargo test --release --all-features
