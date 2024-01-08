@@ -34,14 +34,6 @@ The implementation keeps dependencies to a minimum, and is `no_std` right out of
 You can enable the optional `serde` feature for proof (de)serialization support.
 You can enable the optional `std` feature for corresponding dependency features.
 
-## Security
-
-The implementation uses [`zeroize`](https://docs.rs/zeroize/latest/zeroize/) to securely wipe the signing key `r` after use.
-However, it does not do so for the index `l`.
-
-Care is taken to keep signing key operations constant time to avoid leaking key data.
-However, index-related operations may not be constant time.
-
 ## Warning
 
 While this implementation is written with security in mind, it is currently **experimental** and not suitable for production use.
