@@ -10,7 +10,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 
 use criterion::Criterion;
-use curve25519_dalek::RistrettoPoint;
+use curve25519_dalek::{RistrettoPoint, Scalar};
 use rand_chacha::ChaCha12Rng;
 use rand_core::SeedableRng;
 use triptych::{
@@ -21,8 +21,9 @@ use triptych::{
 };
 
 // Parameters
-static N_VALUES: [u32; 1] = [2];
-static M_VALUES: [u32; 4] = [2, 4, 8, 10];
+const N_VALUES: [u32; 1] = [2];
+const M_VALUES: [u32; 4] = [2, 4, 8, 10];
+const BATCH_SIZES: [usize; 2] = [2, 4];
 
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
@@ -162,6 +163,72 @@ fn verify_proof(c: &mut Criterion) {
     group.finish();
 }
 
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+fn verify_batch_proof(c: &mut Criterion) {
+    let mut group = c.benchmark_group("verify_batch_proof");
+    let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+
+    for n in N_VALUES {
+        for m in M_VALUES {
+            for batch in BATCH_SIZES {
+                // Generate parameters
+                let params = Arc::new(Parameters::new(n, m).unwrap());
+
+                let label = format!(
+                    "Verify batch proof: n = {}, m = {} (N = {}), {}-batch",
+                    n,
+                    m,
+                    params.get_N(),
+                    batch
+                );
+                group.bench_function(&label, |b| {
+                    // Generate witnesses; for this test, we use adjacent indexes for simplicity
+                    // This means the batch size must not exceed the input set size!
+                    assert!(batch <= params.get_N() as usize);
+                    let mut witnesses = Vec::with_capacity(batch);
+                    witnesses.push(Witness::random(&params, &mut rng));
+                    for _ in 1..batch {
+                        let r = Scalar::random(&mut rng);
+                        let l = (witnesses.last().unwrap().get_l() + 1) % params.get_N();
+                        witnesses.push(Witness::new(&params, l, &r).unwrap());
+                    }
+
+                    // Generate input set from all witnesses
+                    let mut M = (0..params.get_N())
+                        .map(|_| RistrettoPoint::random(&mut rng))
+                        .collect::<Vec<RistrettoPoint>>();
+                    for witness in &witnesses {
+                        M[witness.get_l() as usize] = witness.compute_verification_key();
+                    }
+                    let input_set = Arc::new(InputSet::new(&M));
+
+                    // Generate statements
+                    let mut statements = Vec::with_capacity(batch);
+                    for witness in &witnesses {
+                        let J = witness.compute_linking_tag();
+                        let message = "Proof message".as_bytes();
+                        statements.push(Statement::new(&params, &input_set, &J, Some(message)).unwrap());
+                    }
+
+                    // Generate proofs
+                    let proofs = witnesses
+                        .iter()
+                        .zip(statements.iter())
+                        .map(|(w, s)| Proof::prove_vartime(w, s, &mut rng).unwrap())
+                        .collect::<Vec<Proof>>();
+
+                    // Start the benchmark
+                    b.iter(|| {
+                        assert!(Proof::verify_batch(&statements, &proofs));
+                    })
+                });
+            }
+        }
+    }
+    group.finish();
+}
+
 criterion_group! {
     name = generate;
     config = Criterion::default();
@@ -171,7 +238,7 @@ criterion_group! {
 criterion_group! {
     name = verify;
     config = Criterion::default();
-    targets = verify_proof
+    targets = verify_proof, verify_batch_proof
 }
 
 criterion_main!(generate, verify);
