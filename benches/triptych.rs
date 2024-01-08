@@ -54,13 +54,13 @@ fn generate_proof(c: &mut Criterion) {
 
                 // Generate statement
                 let J = witness.compute_linking_tag();
-                let statement = Statement::new(&params, &input_set, &J).unwrap();
+                let message = "Proof message".as_bytes();
+                let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
 
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof =
-                        Proof::prove(&witness, &statement, Some("Proof message".as_bytes()), &mut rng).unwrap();
+                    let _proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
                 })
             });
         }
@@ -103,13 +103,13 @@ fn generate_proof_vartime(c: &mut Criterion) {
 
                 // Generate statement
                 let J = witness.compute_linking_tag();
-                let statement = Statement::new(&params, &input_set, &J).unwrap();
+                let message = "Proof message".as_bytes();
+                let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
 
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof =
-                        Proof::prove_vartime(&witness, &statement, Some("Proof message".as_bytes()), &mut rng).unwrap();
+                    let _proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
                 })
             });
         }
@@ -147,14 +147,14 @@ fn verify_proof(c: &mut Criterion) {
 
                 // Generate statement
                 let J = witness.compute_linking_tag();
-                let statement = Statement::new(&params, &input_set, &J).unwrap();
-
                 let message = "Proof message".as_bytes();
-                let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
+                let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
+
+                let proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
 
                 // Start the benchmark
                 b.iter(|| {
-                    assert!(proof.verify(&statement, Some(message)));
+                    assert!(proof.verify(&statement));
                 })
             });
         }
