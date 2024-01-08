@@ -10,6 +10,8 @@ Successful verification of a signature means that the signer knew the signing ke
 It also produces a linking tag; if any two verified signatures have the same linking tag, they were produced using the same signing key.
 However, it is not possible to determine the signing key associated to a linking tag, nor the corresponding verification key.
 
+Triptych proofs scale nicely, with their size increasingly only logarithmically with the size of the verification key set. Proofs sharing the same verification key set can also be verified efficiently in batches to save time.
+
 More formally, let `G` and `U` be fixed independent generators of the Ristretto group.
 Let `N = n**m`, where `n, m > 1` are fixed parameters.
 The Triptych proving system protocol is a sigma protocol for the following relation, where `M` is an `N`-vector of group elements:
