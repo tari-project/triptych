@@ -50,7 +50,8 @@ impl InputSet {
 
 /// A Triptych proof statement.
 ///
-/// The statement consists of an input set of verification keys and a linking tag.
+/// The statement consists of an input set of verification keys, a linking tag, and an optional message.
+/// If provided, the message is bound to any proof generated using the statement.
 /// It also contains parameters that, among other things, enforce the size of the input set.
 #[allow(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
@@ -58,6 +59,7 @@ pub struct Statement {
     params: Arc<Parameters>,
     input_set: Arc<InputSet>,
     J: RistrettoPoint,
+    message: Option<Vec<u8>>,
 }
 
 /// Errors that can arise relating to `Statement`.
@@ -75,12 +77,14 @@ impl Statement {
     /// parameters `params`, and which does not contain the identity group element.
     /// If either of these conditions is not met, returns an error.
     ///
+    /// If provided, the optional `message` will be bound to any proof generated using the resulting statement.
     /// The linking tag `J` is assumed to have been computed from witness data or otherwise provided externally.
     #[allow(non_snake_case)]
     pub fn new(
         params: &Arc<Parameters>,
         input_set: &Arc<InputSet>,
         J: &RistrettoPoint,
+        message: Option<&[u8]>,
     ) -> Result<Self, StatementError> {
         // Check that the input vector is valid against the parameters
         if input_set.get_keys().len() != params.get_N() as usize {
@@ -94,6 +98,7 @@ impl Statement {
             params: params.clone(),
             input_set: input_set.clone(),
             J: *J,
+            message: message.map(|m| m.to_vec()),
         })
     }
 
@@ -111,5 +116,13 @@ impl Statement {
     #[allow(non_snake_case)]
     pub fn get_J(&self) -> &RistrettoPoint {
         &self.J
+    }
+
+    /// Get the message for this statement
+    pub fn get_message(&self) -> Option<&[u8]> {
+        match &self.message {
+            Some(message) => Some(message.as_slice()),
+            None => None,
+        }
     }
 }

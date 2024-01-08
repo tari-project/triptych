@@ -91,18 +91,17 @@ impl Proof {
     ///
     /// You must also supply a cryptographically-secure random number generator `rng`.
     ///
-    /// You may optionally provide a byte slice `message` that is bound to the proof's Fiat-Shamir transcript.
-    /// The verifier must provide the same message in order for the proof to verify.
+    /// If the statement includes an optional message, it is bound to the proof's Fiat-Shamir transcript.
+    /// The verifier must provide the same message in its statement in order for the proof to verify.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
     /// If you want any attempt at avoiding timing side-channel attacks, use `prove` instead.
     pub fn prove_vartime<R: CryptoRngCore>(
         witness: &Witness,
         statement: &Statement,
-        message: Option<&[u8]>,
         rng: &mut R,
     ) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, message, rng, true)
+        Self::prove_internal(witness, statement, rng, true)
     }
 
     /// Generate a Triptych proof.
@@ -113,18 +112,13 @@ impl Proof {
     ///
     /// You must also supply a cryptographically-secure random number generator `rng`.
     ///
-    /// You may optionally provide a byte slice `message` that is bound to the proof's Fiat-Shamir transcript.
-    /// The verifier must provide the same message in order for the proof to verify.
+    /// If the statement includes an optional message, it is bound to the proof's Fiat-Shamir transcript.
+    /// The verifier must provide the same message in its statement in order for the proof to verify.
     ///
     /// This function makes some attempt at avoiding timing side-channel attacks.
     /// If you know you don't need this, you can use `prove_vartime` for speedier operations.
-    pub fn prove<R: CryptoRngCore>(
-        witness: &Witness,
-        statement: &Statement,
-        message: Option<&[u8]>,
-        rng: &mut R,
-    ) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, message, rng, false)
+    pub fn prove<R: CryptoRngCore>(witness: &Witness, statement: &Statement, rng: &mut R) -> Result<Self, ProofError> {
+        Self::prove_internal(witness, statement, rng, false)
     }
 
     /// The actual prover functionality.
@@ -132,7 +126,6 @@ impl Proof {
     fn prove_internal<R: CryptoRngCore>(
         witness: &Witness,
         statement: &Statement,
-        message: Option<&[u8]>,
         rng: &mut R,
         vartime: bool,
     ) -> Result<Self, ProofError> {
@@ -159,7 +152,7 @@ impl Proof {
         // Start the transcript
         let mut transcript = Transcript::new("Triptych proof".as_bytes());
         transcript.append_u64("version".as_bytes(), VERSION);
-        if let Some(message) = message {
+        if let Some(message) = statement.get_message() {
             transcript.append_message("message".as_bytes(), message);
         }
         transcript.append_message("params".as_bytes(), params.get_hash());
@@ -347,12 +340,12 @@ impl Proof {
 
     /// Verify a Triptych proof.
     ///
-    /// Verification requires that the statement `statement` and optional byte slice `message` match those used when the
+    /// Verification requires that the statement `statement` match that used when the
     /// proof was generated.
     ///
     /// Returns a boolean that is `true` if and only if the proof is valid.
     #[allow(clippy::too_many_lines, non_snake_case)]
-    pub fn verify(&self, statement: &Statement, message: Option<&[u8]>) -> bool {
+    pub fn verify(&self, statement: &Statement) -> bool {
         // Extract statement values for convenience
         let M = statement.get_input_set().get_keys();
         let params = statement.get_params();
@@ -377,7 +370,7 @@ impl Proof {
         // Generate the verifier challenge
         let mut transcript = Transcript::new("Triptych proof".as_bytes());
         transcript.append_u64("version".as_bytes(), VERSION);
-        if let Some(message) = message {
+        if let Some(message) = statement.get_message() {
             transcript.append_message("message".as_bytes(), message);
         }
         transcript.append_message("params".as_bytes(), params.get_hash());
@@ -564,7 +557,8 @@ mod test {
 
         // Generate statement
         let J = witness.compute_linking_tag();
-        let statement = Statement::new(&params, &input_set, &J).unwrap();
+        let message = "Proof message".as_bytes();
+        let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
 
         (witness, statement)
     }
@@ -579,9 +573,8 @@ mod test {
         let (witness, statement) = generate_data(n, m, &mut rng);
 
         // Generate and verify a proof
-        let message = "Proof messsage".as_bytes();
-        let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
-        assert!(proof.verify(&statement, Some(message)));
+        let proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
+        assert!(proof.verify(&statement));
     }
 
     #[test]
@@ -594,9 +587,8 @@ mod test {
         let (witness, statement) = generate_data(n, m, &mut rng);
 
         // Generate and verify a proof
-        let message = "Proof messsage".as_bytes();
-        let proof = Proof::prove_vartime(&witness, &statement, Some(message), &mut rng).unwrap();
-        assert!(proof.verify(&statement, Some(message)));
+        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
+        assert!(proof.verify(&statement));
     }
 
     #[test]
@@ -609,12 +601,19 @@ mod test {
         let (witness, statement) = generate_data(n, m, &mut rng);
 
         // Generate a proof
-        let message = "Proof messsage".as_bytes();
-        let proof = Proof::prove_vartime(&witness, &statement, Some(message), &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
 
-        // Attempt to verify the proof against a different message, which should fail
-        let evil_message = "Evil proof message".as_bytes();
-        assert!(!proof.verify(&statement, Some(evil_message)));
+        // Generate a statement with a modified message
+        let evil_statement = Statement::new(
+            statement.get_params(),
+            statement.get_input_set(),
+            statement.get_J(),
+            Some("Evil proof message".as_bytes()),
+        )
+        .unwrap();
+
+        // Attempt to verify the proof against the new statement, which should fail
+        assert!(!proof.verify(&evil_statement));
     }
 
     #[test]
@@ -627,18 +626,23 @@ mod test {
         let (witness, statement) = generate_data(n, m, &mut rng);
 
         // Generate a proof
-        let message = "Proof messsage".as_bytes();
-        let proof = Proof::prove_vartime(&witness, &statement, Some(message), &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
 
         // Generate a statement with a modified input set
         let mut M = statement.get_input_set().get_keys().to_vec();
         let index = ((witness.get_l() + 1) % witness.get_params().get_N()) as usize;
         M[index] = RistrettoPoint::random(&mut rng);
         let evil_input_set = Arc::new(InputSet::new(&M));
-        let evil_statement = Statement::new(statement.get_params(), &evil_input_set, statement.get_J()).unwrap();
+        let evil_statement = Statement::new(
+            statement.get_params(),
+            &evil_input_set,
+            statement.get_J(),
+            statement.get_message(),
+        )
+        .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message)));
+        assert!(!proof.verify(&evil_statement));
     }
 
     #[test]
@@ -651,18 +655,18 @@ mod test {
         let (witness, statement) = generate_data(n, m, &mut rng);
 
         // Generate a proof
-        let message = "Proof messsage".as_bytes();
-        let proof = Proof::prove_vartime(&witness, &statement, Some(message), &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
 
         // Generate a statement with a modified linking tag
         let evil_statement = Statement::new(
             statement.get_params(),
             statement.get_input_set(),
             &RistrettoPoint::random(&mut rng),
+            statement.get_message(),
         )
         .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, Some(message)));
+        assert!(!proof.verify(&evil_statement));
     }
 }

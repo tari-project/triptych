@@ -88,22 +88,16 @@
 //!     .collect::<Vec<RistrettoPoint>>();
 //! let input_set = Arc::new(InputSet::new(&M));
 //!
-//! // Generate the statement, which includes the verification key vector and linking tag
+//! // Generate the statement, which includes the verification key vector, linking tag, and optional message
 //! let J = witness.compute_linking_tag();
-//! let statement = Statement::new(&params, &input_set, &J).unwrap();
-//!
-//! // We can optionally specify an arbitrary message to bind into the proof
 //! let message = "This message will be bound to the proof".as_bytes();
+//! let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
 //!
 //! // Generate a proof from the witness
-//! let proof = Proof::prove(&witness, &statement, Some(message), &mut rng).unwrap();
+//! let proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
 //!
-//! // The proof should verify against the statement and message
-//! assert!(proof.verify(&statement, Some(message)));
-//!
-//! // The proof should not verify against a different message
-//! let evil_message = "Pure evil".as_bytes();
-//! assert!(!proof.verify(&statement, Some(evil_message)));
+//! // The proof should verify against the same statement
+//! assert!(proof.verify(&statement));
 //! ```
 
 #![no_std]
