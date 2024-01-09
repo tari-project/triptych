@@ -37,6 +37,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Docs
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Release build (no features)
+        run: cargo build --release --all-targets
+      - name: Release (features)
+        run: cargo build --release --all-targets --all-features
   test:
     runs-on: ubuntu-latest
     steps:
