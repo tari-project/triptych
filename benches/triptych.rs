@@ -9,7 +9,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use criterion::Criterion;
+use criterion::{black_box, Criterion};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use itertools::izip;
 use merlin::Transcript;
@@ -93,8 +93,9 @@ fn generate_proof(c: &mut Criterion) {
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof =
-                        Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+                    black_box(
+                        Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap(),
+                    );
                 })
             });
         }
@@ -126,9 +127,10 @@ fn generate_proof_vartime(c: &mut Criterion) {
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof =
+                    black_box(
                         Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                            .unwrap();
+                            .unwrap(),
+                    );
                 })
             });
         }
@@ -158,7 +160,7 @@ fn verify_proof(c: &mut Criterion) {
                 // Start the benchmark
                 b.iter(|| {
                     // Verify the proof
-                    assert!(proof.verify(&statements[0], &mut transcripts[0].clone()));
+                    assert!(black_box(proof.verify(&statements[0], &mut transcripts[0].clone())));
                 })
             });
         }
@@ -197,7 +199,11 @@ fn verify_batch_proof(c: &mut Criterion) {
                     // Start the benchmark
                     b.iter(|| {
                         // Verify the proofs in a batch
-                        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts.clone()));
+                        assert!(black_box(Proof::verify_batch(
+                            &statements,
+                            &proofs,
+                            &mut transcripts.clone()
+                        )));
                     })
                 });
             }
