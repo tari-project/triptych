@@ -189,7 +189,7 @@ fn verify_batch_proof(c: &mut Criterion) {
                 );
                 group.bench_function(&label, |b| {
                     // Generate data
-                    let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
+                    let (witnesses, statements, transcripts) = generate_data(&params, batch, &mut rng);
 
                     // Generate the proofs
                     let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
