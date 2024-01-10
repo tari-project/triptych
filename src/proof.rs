@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 use alloc::{vec, vec::Vec};
-use core::iter::once;
+use core::{iter::once, slice};
 
 use curve25519_dalek::{
     traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
@@ -345,7 +345,7 @@ impl Proof {
     /// Returns a boolean that is `true` if and only if the above requirement is met and the proof is valid.
     pub fn verify(&self, statement: &Statement) -> bool {
         // Verify as a trivial batch
-        Self::verify_batch(&[statement.clone()], &[self.clone()])
+        Self::verify_batch(slice::from_ref(statement), slice::from_ref(self))
     }
 
     /// Verify a batch of Triptych proofs that share a common input set and parameters.
