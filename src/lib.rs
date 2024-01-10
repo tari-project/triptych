@@ -23,7 +23,7 @@
 //! `{ M, J ; (l, r) : M[l] = r*G, r*J = U }`
 //!
 //! It's possible to use the Fiat-Shamir transformation to produce a non-interactive protocol that can additionally bind
-//! an arbitrary message into the proof. This produces the linkable ring signature.
+//! an arbitrary message into the transcript. This produces the linkable ring signature.
 //!
 //! # Implementation notes
 //!
@@ -54,6 +54,7 @@
 //!
 //! # use triptych::parameters::Parameters;
 //! use curve25519_dalek::RistrettoPoint;
+//! use merlin::Transcript;
 //! use rand_core::OsRng;
 //! # use triptych::statement::InputSet;
 //! # use triptych::statement::Statement;
@@ -84,16 +85,19 @@
 //!     .collect::<Vec<RistrettoPoint>>();
 //! let input_set = Arc::new(InputSet::new(&M));
 //!
-//! // Generate the statement, which includes the verification key vector, linking tag, and optional message
+//! // Generate the statement, which includes the verification key vector and linking tag
 //! let J = witness.compute_linking_tag();
 //! let message = "This message will be bound to the proof".as_bytes();
-//! let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
+//! let statement = Statement::new(&params, &input_set, &J).unwrap();
+//!
+//! // Generate a transcript
+//! let mut transcript = Transcript::new("Test transcript".as_bytes());
 //!
 //! // Generate a proof from the witness
-//! let proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
+//! let proof = Proof::prove(&witness, &statement, &mut rng, &mut transcript.clone()).unwrap();
 //!
-//! // The proof should verify against the same statement
-//! assert!(proof.verify(&statement));
+//! // The proof should verify against the same statement and transcript
+//! assert!(proof.verify(&statement, &mut transcript));
 //! ```
 
 #![no_std]

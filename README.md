@@ -18,7 +18,7 @@ The Triptych proving system protocol is a sigma protocol for the following relat
 
 `{ M, J ; (l, r) : M[l] = r*G, r*J = U }`
 
-It's possible to use the Fiat-Shamir transformation to produce a non-interactive protocol that can additionally bind an arbitrary message into the proof.
+It's possible to use the Fiat-Shamir transformation to produce a non-interactive protocol that can additionally bind an arbitrary message into the transcript.
 This produces the linkable ring signature.
 
 ## Implementation notes

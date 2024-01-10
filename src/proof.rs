@@ -9,6 +9,7 @@ use curve25519_dalek::{
     RistrettoPoint,
     Scalar,
 };
+use itertools::izip;
 use merlin::Transcript;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
@@ -89,10 +90,7 @@ impl Proof {
     /// If the witness and statement do not share the same parameters, or if the statement is invalid for the witness,
     /// returns an error.
     ///
-    /// You must also supply a cryptographically-secure random number generator `rng`.
-    ///
-    /// If the statement includes an optional message, it is bound to the proof's Fiat-Shamir transcript.
-    /// The verifier must provide the same message in its statement in order for the proof to verify.
+    /// You must also supply a cryptographically-secure random number generator `rng` and a Merlin `transcript`.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
     /// If you want any attempt at avoiding timing side-channel attacks, use `prove` instead.
@@ -100,8 +98,9 @@ impl Proof {
         witness: &Witness,
         statement: &Statement,
         rng: &mut R,
+        transcript: &mut Transcript,
     ) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, rng, true)
+        Self::prove_internal(witness, statement, rng, transcript, true)
     }
 
     /// Generate a Triptych proof.
@@ -110,15 +109,17 @@ impl Proof {
     /// If the witness and statement do not share the same parameters, or if the statement is invalid for the witness,
     /// returns an error.
     ///
-    /// You must also supply a cryptographically-secure random number generator `rng`.
-    ///
-    /// If the statement includes an optional message, it is bound to the proof's Fiat-Shamir transcript.
-    /// The verifier must provide the same message in its statement in order for the proof to verify.
+    /// You must also supply a cryptographically-secure random number generator `rng` and a Merlin `transcript`.
     ///
     /// This function makes some attempt at avoiding timing side-channel attacks.
     /// If you know you don't need this, you can use `prove_vartime` for speedier operations.
-    pub fn prove<R: CryptoRngCore>(witness: &Witness, statement: &Statement, rng: &mut R) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, rng, false)
+    pub fn prove<R: CryptoRngCore>(
+        witness: &Witness,
+        statement: &Statement,
+        rng: &mut R,
+        transcript: &mut Transcript,
+    ) -> Result<Self, ProofError> {
+        Self::prove_internal(witness, statement, rng, transcript, false)
     }
 
     /// The actual prover functionality.
@@ -127,6 +128,7 @@ impl Proof {
         witness: &Witness,
         statement: &Statement,
         rng: &mut R,
+        transcript: &mut Transcript,
         vartime: bool,
     ) -> Result<Self, ProofError> {
         // Check that the witness and statement have identical parameters
@@ -149,12 +151,9 @@ impl Proof {
             return Err(ProofError::InvalidParameter);
         }
 
-        // Start the transcript
-        let mut transcript = Transcript::new("Triptych proof".as_bytes());
+        // Continue the transcript with domain separation
+        transcript.append_message("dom-sep".as_bytes(), "Triptych proof".as_bytes());
         transcript.append_u64("version".as_bytes(), VERSION);
-        if let Some(message) = statement.get_message() {
-            transcript.append_message("message".as_bytes(), message);
-        }
         transcript.append_message("params".as_bytes(), params.get_hash());
         transcript.append_message("M".as_bytes(), statement.get_input_set().get_hash());
         transcript.append_message("J".as_bytes(), J.compress().as_bytes());
@@ -304,7 +303,7 @@ impl Proof {
         }
 
         // Get challenge powers
-        let xi_powers = xi_powers(&mut transcript, params.get_m())?;
+        let xi_powers = xi_powers(transcript, params.get_m())?;
 
         // Compute the `f` matrix
         let f = (0..params.get_m())
@@ -340,25 +339,32 @@ impl Proof {
 
     /// Verify a Triptych proof.
     ///
-    /// Verification requires that the statement `statement` match that used when the proof was generated.
+    /// Verification requires that the `statement` and `transcript` match those used when the proof was generated.
     ///
     /// Returns a boolean that is `true` if and only if the above requirement is met and the proof is valid.
-    pub fn verify(&self, statement: &Statement) -> bool {
+    pub fn verify(&self, statement: &Statement, transcript: &mut Transcript) -> bool {
         // Verify as a trivial batch
-        Self::verify_batch(slice::from_ref(statement), slice::from_ref(self))
+        Self::verify_batch(
+            slice::from_ref(statement),
+            slice::from_ref(self),
+            slice::from_mut(transcript),
+        )
     }
 
     /// Verify a batch of Triptych proofs that share a common input set and parameters.
     ///
-    /// Verification requires that the statements `statements` match those used when the proofs were generated, and that
-    /// they share a common input set and parameters.
+    /// Verification requires that the `statements` and `transcripts` match those used when the `proofs` were generated,
+    /// and that they share a common input set and parameters.
     ///
     /// Returns a boolean that is `true` if and only if the above requirements are met and each proof is valid.
     /// If the batch is empty, returns `true`.
     #[allow(clippy::too_many_lines, non_snake_case)]
-    pub fn verify_batch(statements: &[Statement], proofs: &[Proof]) -> bool {
-        // Check that we have the same number of statements and proofs
+    pub fn verify_batch(statements: &[Statement], proofs: &[Proof], transcripts: &mut [Transcript]) -> bool {
+        // Check that we have the same number of statements, proofs, and transcripts
         if statements.len() != proofs.len() {
+            return false;
+        }
+        if statements.len() != transcripts.len() {
             return false;
         }
 
@@ -470,13 +476,10 @@ impl Proof {
 
         // Generate all verifier challenges
         let mut xi_powers_all = Vec::with_capacity(proofs.len());
-        for (statement, proof) in statements.iter().zip(proofs.iter()) {
+        for (statement, proof, transcript) in izip!(statements.iter(), proofs.iter(), transcripts.iter_mut()) {
             // Generate the verifier challenge
-            let mut transcript = Transcript::new("Triptych proof".as_bytes());
+            transcript.append_message("dom-sep".as_bytes(), "Triptych proof".as_bytes());
             transcript.append_u64("version".as_bytes(), VERSION);
-            if let Some(message) = statement.get_message() {
-                transcript.append_message("message".as_bytes(), message);
-            }
             transcript.append_message("params".as_bytes(), params.get_hash());
             transcript.append_message("M".as_bytes(), statement.get_input_set().get_hash());
             transcript.append_message("J".as_bytes(), statement.get_J().compress().as_bytes());
@@ -493,7 +496,7 @@ impl Proof {
             }
 
             // Get challenge powers
-            let xi_powers = match xi_powers(&mut transcript, params.get_m()) {
+            let xi_powers = match xi_powers(transcript, params.get_m()) {
                 Ok(xi_powers) => xi_powers,
                 _ => {
                     return false;
@@ -632,6 +635,8 @@ mod test {
     use alloc::{sync::Arc, vec::Vec};
 
     use curve25519_dalek::{RistrettoPoint, Scalar};
+    use itertools::izip;
+    use merlin::Transcript;
     use rand_chacha::ChaCha12Rng;
     use rand_core::{CryptoRngCore, SeedableRng};
 
@@ -642,38 +647,14 @@ mod test {
         witness::Witness,
     };
 
-    // Generate a witness and corresponding statement
+    // Generate a batch of witnesses, statements, and transcripts
     #[allow(non_snake_case)]
-    fn generate_data<R: CryptoRngCore>(n: u32, m: u32, rng: &mut R) -> (Witness, Statement) {
-        // Generate parameters
-        let params = Arc::new(Parameters::new(n, m).unwrap());
-
-        // Generate witness
-        let witness = Witness::random(&params, rng);
-
-        // Generate input set
-        let M = (0..params.get_N())
-            .map(|i| {
-                if i == witness.get_l() {
-                    witness.compute_verification_key()
-                } else {
-                    RistrettoPoint::random(rng)
-                }
-            })
-            .collect::<Vec<RistrettoPoint>>();
-        let input_set = Arc::new(InputSet::new(&M));
-
-        // Generate statement
-        let J = witness.compute_linking_tag();
-        let message = "Proof message".as_bytes();
-        let statement = Statement::new(&params, &input_set, &J, Some(message)).unwrap();
-
-        (witness, statement)
-    }
-
-    // Generate a batch of witnesses and corresponding statements
-    #[allow(non_snake_case)]
-    fn generate_batch_data<R: CryptoRngCore>(n: u32, m: u32, b: usize, rng: &mut R) -> (Vec<Witness>, Vec<Statement>) {
+    fn generate_data<R: CryptoRngCore>(
+        n: u32,
+        m: u32,
+        b: usize,
+        rng: &mut R,
+    ) -> (Vec<Witness>, Vec<Statement>, Vec<Transcript>) {
         // Generate parameters
         let params = Arc::new(Parameters::new(n, m).unwrap());
 
@@ -701,11 +682,20 @@ mod test {
         let mut statements = Vec::with_capacity(b);
         for witness in &witnesses {
             let J = witness.compute_linking_tag();
-            let message = "Proof message".as_bytes();
-            statements.push(Statement::new(&params, &input_set, &J, Some(message)).unwrap());
+            statements.push(Statement::new(&params, &input_set, &J).unwrap());
         }
 
-        (witnesses, statements)
+        // Generate transcripts
+        let transcripts = (0..b)
+            .map(|i| {
+                let mut transcript = Transcript::new("Test transcript".as_bytes());
+                transcript.append_u64("index".as_bytes(), i as u64);
+
+                transcript
+            })
+            .collect::<Vec<Transcript>>();
+
+        (witnesses, statements, transcripts)
     }
 
     #[test]
@@ -715,11 +705,11 @@ mod test {
         const n: u32 = 2;
         const m: u32 = 4;
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witness, statement) = generate_data(n, m, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof = Proof::prove(&witness, &statement, &mut rng).unwrap();
-        assert!(proof.verify(&statement));
+        let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        assert!(proof.verify(&statements[0], &mut transcripts[0]));
     }
 
     #[test]
@@ -729,11 +719,11 @@ mod test {
         const n: u32 = 2;
         const m: u32 = 4;
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witness, statement) = generate_data(n, m, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
-        assert!(proof.verify(&statement));
+        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        assert!(proof.verify(&statements[0], &mut transcripts[0]));
     }
 
     #[test]
@@ -742,17 +732,15 @@ mod test {
         // Generate data
         const n: u32 = 2;
         const m: u32 = 4;
-        const b: usize = 3; // batch size
+        const batch: usize = 3; // batch size
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witnesses, statements) = generate_batch_data(n, m, b, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, batch, &mut rng);
 
         // Generate the proofs and verify as a batch
-        let proofs = witnesses
-            .iter()
-            .zip(statements.iter())
-            .map(|(w, s)| Proof::prove_vartime(w, s, &mut rng).unwrap())
+        let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
+            .map(|(w, s, t)| Proof::prove_vartime(w, s, &mut rng, t).unwrap())
             .collect::<Vec<Proof>>();
-        assert!(Proof::verify_batch(&statements, &proofs));
+        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts));
     }
 
     #[test]
@@ -762,22 +750,16 @@ mod test {
         const n: u32 = 2;
         const m: u32 = 4;
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witness, statement) = generate_data(n, m, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0]).unwrap();
 
-        // Generate a statement with a modified message
-        let evil_statement = Statement::new(
-            statement.get_params(),
-            statement.get_input_set(),
-            statement.get_J(),
-            Some("Evil proof message".as_bytes()),
-        )
-        .unwrap();
+        // Generate a modified transcript
+        let mut evil_transcript = Transcript::new("Evil transcript".as_bytes());
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement));
+        assert!(!proof.verify(&statements[0], &mut evil_transcript));
     }
 
     #[test]
@@ -787,26 +769,21 @@ mod test {
         const n: u32 = 2;
         const m: u32 = 4;
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witness, statement) = generate_data(n, m, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
 
         // Generate a statement with a modified input set
-        let mut M = statement.get_input_set().get_keys().to_vec();
-        let index = ((witness.get_l() + 1) % witness.get_params().get_N()) as usize;
+        let mut M = statements[0].get_input_set().get_keys().to_vec();
+        let index = ((witnesses[0].get_l() + 1) % witnesses[0].get_params().get_N()) as usize;
         M[index] = RistrettoPoint::random(&mut rng);
         let evil_input_set = Arc::new(InputSet::new(&M));
-        let evil_statement = Statement::new(
-            statement.get_params(),
-            &evil_input_set,
-            statement.get_J(),
-            statement.get_message(),
-        )
-        .unwrap();
+        let evil_statement =
+            Statement::new(statements[0].get_params(), &evil_input_set, statements[0].get_J()).unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement));
+        assert!(!proof.verify(&evil_statement, &mut transcripts[0]));
     }
 
     #[test]
@@ -816,21 +793,20 @@ mod test {
         const n: u32 = 2;
         const m: u32 = 4;
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witness, statement) = generate_data(n, m, &mut rng);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witness, &statement, &mut rng).unwrap();
+        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
 
         // Generate a statement with a modified linking tag
         let evil_statement = Statement::new(
-            statement.get_params(),
-            statement.get_input_set(),
+            statements[0].get_params(),
+            statements[0].get_input_set(),
             &RistrettoPoint::random(&mut rng),
-            statement.get_message(),
         )
         .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement));
+        assert!(!proof.verify(&evil_statement, &mut transcripts[0]));
     }
 }

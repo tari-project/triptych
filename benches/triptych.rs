@@ -11,6 +11,8 @@ use alloc::sync::Arc;
 
 use criterion::Criterion;
 use curve25519_dalek::{RistrettoPoint, Scalar};
+use itertools::izip;
+use merlin::Transcript;
 use rand_chacha::ChaCha12Rng;
 use rand_core::{CryptoRngCore, SeedableRng};
 use triptych::{
@@ -25,13 +27,13 @@ const N_VALUES: [u32; 1] = [2];
 const M_VALUES: [u32; 4] = [2, 4, 8, 10];
 const BATCH_SIZES: [usize; 1] = [2];
 
-// Generate a batch of witnesses and corresponding statements
+// Generate a batch of witnesses, statements, and transcripts
 #[allow(non_snake_case)]
-fn generate_batch_data<R: CryptoRngCore>(
+fn generate_data<R: CryptoRngCore>(
     params: &Arc<Parameters>,
     b: usize,
     rng: &mut R,
-) -> (Vec<Witness>, Vec<Statement>) {
+) -> (Vec<Witness>, Vec<Statement>, Vec<Transcript>) {
     // Generate witnesses; for this test, we use adjacent indexes for simplicity
     // This means the batch size must not exceed the input set size!
     assert!(b <= params.get_N() as usize);
@@ -56,11 +58,20 @@ fn generate_batch_data<R: CryptoRngCore>(
     let mut statements = Vec::with_capacity(b);
     for witness in &witnesses {
         let J = witness.compute_linking_tag();
-        let message = "Proof message".as_bytes();
-        statements.push(Statement::new(params, &input_set, &J, Some(message)).unwrap());
+        statements.push(Statement::new(params, &input_set, &J).unwrap());
     }
 
-    (witnesses, statements)
+    // Generate transcripts
+    let transcripts = (0..b)
+        .map(|i| {
+            let mut transcript = Transcript::new("Test transcript".as_bytes());
+            transcript.append_u64("index".as_bytes(), i as u64);
+
+            transcript
+        })
+        .collect::<Vec<Transcript>>();
+
+    (witnesses, statements, transcripts)
 }
 
 #[allow(non_snake_case)]
@@ -77,12 +88,13 @@ fn generate_proof(c: &mut Criterion) {
             let label = format!("Generate proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
                 // Generate data
-                let (witnesses, statements) = generate_batch_data(&params, 1, &mut rng);
+                let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof = Proof::prove(&witnesses[0], &statements[0], &mut rng).unwrap();
+                    let _proof =
+                        Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
                 })
             });
         }
@@ -109,12 +121,14 @@ fn generate_proof_vartime(c: &mut Criterion) {
             );
             group.bench_function(&label, |b| {
                 // Generate data
-                let (witnesses, statements) = generate_batch_data(&params, 1, &mut rng);
+                let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Start the benchmark
                 b.iter(|| {
                     // Generate the proof
-                    let _proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng).unwrap();
+                    let _proof =
+                        Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+                            .unwrap();
                 })
             });
         }
@@ -136,15 +150,15 @@ fn verify_proof(c: &mut Criterion) {
             let label = format!("Verify proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
                 // Generate data
-                let (witnesses, statements) = generate_batch_data(&params, 1, &mut rng);
+                let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Generate the proof
-                let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng).unwrap();
+                let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
 
                 // Start the benchmark
                 b.iter(|| {
                     // Verify the proof
-                    assert!(proof.verify(&statements[0]));
+                    assert!(proof.verify(&statements[0], &mut transcripts[0].clone()));
                 })
             });
         }
@@ -173,19 +187,17 @@ fn verify_batch_proof(c: &mut Criterion) {
                 );
                 group.bench_function(&label, |b| {
                     // Generate data
-                    let (witnesses, statements) = generate_batch_data(&params, 1, &mut rng);
+                    let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                     // Generate the proofs
-                    let proofs = witnesses
-                        .iter()
-                        .zip(statements.iter())
-                        .map(|(w, s)| Proof::prove_vartime(w, s, &mut rng).unwrap())
+                    let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
+                        .map(|(w, s, t)| Proof::prove_vartime(w, s, &mut rng, t).unwrap())
                         .collect::<Vec<Proof>>();
 
                     // Start the benchmark
                     b.iter(|| {
                         // Verify the proofs in a batch
-                        assert!(Proof::verify_batch(&statements, &proofs));
+                        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts.clone()));
                     })
                 });
             }
