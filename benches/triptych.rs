@@ -9,7 +9,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use criterion::{black_box, Criterion};
+use criterion::{BatchSize, Criterion};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use itertools::izip;
 use merlin::Transcript;
@@ -91,12 +91,14 @@ fn generate_proof(c: &mut Criterion) {
                 let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Start the benchmark
-                b.iter(|| {
-                    // Generate the proof
-                    black_box(
-                        Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap(),
-                    );
-                })
+                b.iter_batched_ref(
+                    || transcripts[0].clone(),
+                    |t| {
+                        // Generate the proof
+                        Proof::prove(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                    },
+                    BatchSize::SmallInput,
+                )
             });
         }
     }
@@ -125,13 +127,14 @@ fn generate_proof_vartime(c: &mut Criterion) {
                 let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Start the benchmark
-                b.iter(|| {
-                    // Generate the proof
-                    black_box(
-                        Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                            .unwrap(),
-                    );
-                })
+                b.iter_batched_ref(
+                    || transcripts[0].clone(),
+                    |t| {
+                        // Generate the proof
+                        Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                    },
+                    BatchSize::SmallInput,
+                )
             });
         }
     }
@@ -158,10 +161,14 @@ fn verify_proof(c: &mut Criterion) {
                 let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
 
                 // Start the benchmark
-                b.iter(|| {
-                    // Verify the proof
-                    assert!(black_box(proof.verify(&statements[0], &mut transcripts[0].clone())));
-                })
+                b.iter_batched_ref(
+                    || transcripts[0].clone(),
+                    |t| {
+                        // Verify the proof
+                        assert!(proof.verify(&statements[0], t));
+                    },
+                    BatchSize::SmallInput,
+                )
             });
         }
     }
@@ -197,14 +204,14 @@ fn verify_batch_proof(c: &mut Criterion) {
                         .collect::<Vec<Proof>>();
 
                     // Start the benchmark
-                    b.iter(|| {
-                        // Verify the proofs in a batch
-                        assert!(black_box(Proof::verify_batch(
-                            &statements,
-                            &proofs,
-                            &mut transcripts.clone()
-                        )));
-                    })
+                    b.iter_batched_ref(
+                        || transcripts.clone(),
+                        |t| {
+                            // Verify the proofs in a batch
+                            assert!(Proof::verify_batch(&statements, &proofs, t));
+                        },
+                        BatchSize::SmallInput,
+                    )
                 });
             }
         }
