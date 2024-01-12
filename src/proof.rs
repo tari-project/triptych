@@ -18,7 +18,7 @@ use snafu::prelude::*;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
-use crate::{gray::GrayIterator, statement::Statement, util::DangerousRng, witness::Witness};
+use crate::{gray::GrayIterator, statement::Statement, util::NullRng, witness::Witness};
 
 // Proof version flag
 const VERSION: u64 = 0;
@@ -514,13 +514,13 @@ impl Proof {
             transcript.append_message("z_A".as_bytes(), proof.z_A.as_bytes());
             transcript.append_message("z_C".as_bytes(), proof.z_C.as_bytes());
             transcript.append_message("z".as_bytes(), proof.z.as_bytes());
-            let mut transcript_rng = transcript.build_rng().finalize(&mut DangerousRng);
+            let mut transcript_rng = transcript.build_rng().finalize(&mut NullRng);
 
             transcript_weights.append_u64("proof".as_bytes(), transcript_rng.as_rngcore().next_u64());
         }
 
         // Finalize the weighting transcript into a pseudorandom number generator
-        let mut transcript_weights_rng = transcript_weights.build_rng().finalize(&mut DangerousRng);
+        let mut transcript_weights_rng = transcript_weights.build_rng().finalize(&mut NullRng);
 
         // Process each proof
         for (proof, xi_powers) in proofs.iter().zip(xi_powers_all.iter()) {
