@@ -28,11 +28,12 @@ This implementation makes several opinionated choices:
 - It uses [Merlin](https://merlin.cool/) for Fiat-Shamir transcript operations.
 - It uses [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) for other cryptographic hashing operations.
 
-It's possible to generalize these if done safely, but the implementation doesn't (yet) do this.
+The implementation keeps dependencies to a minimum, and is `no_std` friendly.
 
-The implementation keeps dependencies to a minimum, and is `no_std` right out of the box.
-You can enable the optional `serde` feature for proof (de)serialization support.
-You can enable the optional `std` feature for corresponding dependency features.
+There are several features that are enabled by default:
+- `rand`: adds additional prover functionality that supplies a cryptographically-secure random number generator
+- `serde`: adds proof serialization and deserialization
+- `std`: adds corresponding dependency features
 
 ## Warning
 
