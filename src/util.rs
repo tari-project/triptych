@@ -3,6 +3,7 @@ use rand_core::{
     CryptoRng,
     RngCore,
 };
+use zeroize::Zeroize;
 
 /// A "null" random number generator that exists only for deterministic transcript-based weight generation.
 /// This is DANGEROUS in general, and you almost certainly should not use it elsewhere!
@@ -10,10 +11,14 @@ pub(crate) struct DangerousRng;
 
 impl RngCore for DangerousRng {
     #[allow(unused_variables)]
-    fn fill_bytes(&mut self, dest: &mut [u8]) {}
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        dest.zeroize();
+    }
 
     #[allow(unused_variables)]
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.fill_bytes(dest);
+
         Ok(())
     }
 
