@@ -14,8 +14,8 @@ curve25519-dalek = { version = "4.1.1", default-features = false, features = ["a
 itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
 merlin = { version = "3.0.0", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
-serde = { version = "1.0.193", optional = true, default-features = false, features = ["alloc", "derive"] }
-snafu = { version = "0.7.5", default-features = false }
+serde = { version = "1.0.195", optional = true, default-features = false, features = ["alloc", "derive"] }
+snafu = { version = "0.8.0", default-features = false }
 subtle = { version = "2.5.0", default-features = false, features = ["core_hint_black_box"] }
 zeroize = { version = "1.7.0", default-features = false, features = ["alloc"] }
 
