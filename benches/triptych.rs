@@ -95,7 +95,7 @@ fn generate_proof(c: &mut Criterion) {
                     || transcripts[0].clone(),
                     |t| {
                         // Generate the proof
-                        Proof::prove(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                        Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, t).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -131,7 +131,7 @@ fn generate_proof_vartime(c: &mut Criterion) {
                     || transcripts[0].clone(),
                     |t| {
                         // Generate the proof
-                        Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                        Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, t).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -158,7 +158,8 @@ fn verify_proof(c: &mut Criterion) {
                 let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Generate the proof
-                let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+                let proof = Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+                    .unwrap();
 
                 // Start the benchmark
                 b.iter_batched_ref(
@@ -200,7 +201,7 @@ fn verify_batch_proof(c: &mut Criterion) {
 
                     // Generate the proofs
                     let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-                        .map(|(w, s, t)| Proof::prove_vartime(w, s, &mut rng, t).unwrap())
+                        .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
                         .collect::<Vec<Proof>>();
 
                     // Start the benchmark

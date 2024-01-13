@@ -90,15 +90,11 @@ impl Proof {
     /// If the witness and statement do not share the same parameters, or if the statement is invalid for the witness,
     /// returns an error.
     ///
-    /// This function provides a cryptographically-secure random number generator for you.
-    /// If you prefer to supply your own, use `prove_vartime` instead.
-    ///
     /// You must also supply a Merlin `transcript`.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
-    /// If you want any attempt at avoiding timing side-channel attacks, use `prove` or `prove_with_rng` instead.
     #[cfg(feature = "rand")]
-    pub fn prove_vartime_with_rng(
+    pub fn prove_vartime(
         witness: &Witness,
         statement: &Statement,
         transcript: &mut Transcript,
@@ -117,8 +113,7 @@ impl Proof {
     /// You must also supply a cryptographically-secure random number generator `rng` and a Merlin `transcript`.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
-    /// If you want any attempt at avoiding timing side-channel attacks, use `prove` instead.
-    pub fn prove_vartime<R: CryptoRngCore>(
+    pub fn prove_with_rng_vartime<R: CryptoRngCore>(
         witness: &Witness,
         statement: &Statement,
         rng: &mut R,
@@ -134,19 +129,13 @@ impl Proof {
     /// returns an error.
     ///
     /// This function provides a cryptographically-secure random number generator for you.
-    /// If you prefer to supply your own, use `prove` instead.
     ///
     /// You must also supply a Merlin `transcript`.
     ///
     /// This function makes some attempt at avoiding timing side-channel attacks.
-    /// If you know you don't need this, you can use `prove_vartime` or `prove_vartime_with_rng` for speedier
     /// operations.
     #[cfg(feature = "rand")]
-    pub fn prove_with_rng(
-        witness: &Witness,
-        statement: &Statement,
-        transcript: &mut Transcript,
-    ) -> Result<Self, ProofError> {
+    pub fn prove(witness: &Witness, statement: &Statement, transcript: &mut Transcript) -> Result<Self, ProofError> {
         use rand_core::OsRng;
 
         Self::prove_internal(witness, statement, &mut OsRng, transcript, false)
@@ -161,8 +150,7 @@ impl Proof {
     /// You must also supply a cryptographically-secure random number generator `rng` and a Merlin `transcript`.
     ///
     /// This function makes some attempt at avoiding timing side-channel attacks.
-    /// If you know you don't need this, you can use `prove_vartime` for speedier operations.
-    pub fn prove<R: CryptoRngCore>(
+    pub fn prove_with_rng<R: CryptoRngCore>(
         witness: &Witness,
         statement: &Statement,
         rng: &mut R,
@@ -750,20 +738,6 @@ mod test {
     #[test]
     #[cfg(feature = "rand")]
     #[allow(non_snake_case, non_upper_case_globals)]
-    fn test_prove_verify_rand() {
-        // Generate data
-        const n: u32 = 2;
-        const m: u32 = 4;
-        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
-        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
-
-        // Generate and verify a proof
-        let proof = Proof::prove_with_rng(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
-    }
-
-    #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
     fn test_prove_verify() {
         // Generate data
         const n: u32 = 2;
@@ -772,14 +746,13 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof = Proof::prove(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        let proof = Proof::prove(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]));
     }
 
     #[test]
-    #[cfg(feature = "rand")]
     #[allow(non_snake_case, non_upper_case_globals)]
-    fn test_prove_verify_vartime_rand() {
+    fn test_prove_verify_with_rng() {
         // Generate data
         const n: u32 = 2;
         const m: u32 = 4;
@@ -787,11 +760,13 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof = Proof::prove_vartime_with_rng(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
+        let proof =
+            Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]));
     }
 
     #[test]
+    #[cfg(feature = "rand")]
     #[allow(non_snake_case, non_upper_case_globals)]
     fn test_prove_verify_vartime() {
         // Generate data
@@ -801,7 +776,22 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
+        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+    }
+
+    #[test]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_prove_verify_vartime_with_rng() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
+
+        // Generate and verify a proof
+        let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]));
     }
 
@@ -817,7 +807,7 @@ mod test {
 
         // Generate the proofs and verify as a batch
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-            .map(|(w, s, t)| Proof::prove_vartime(w, s, &mut rng, t).unwrap())
+            .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
             .collect::<Vec<Proof>>();
         assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts));
     }
@@ -832,7 +822,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0]).unwrap();
+        let proof =
+            Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0]).unwrap();
 
         // Generate a modified transcript
         let mut evil_transcript = Transcript::new("Evil transcript".as_bytes());
@@ -851,7 +842,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
 
         // Generate a statement with a modified input set
         let mut M = statements[0].get_input_set().get_keys().to_vec();
@@ -875,7 +867,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
+        let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
 
         // Generate a statement with a modified linking tag
         let evil_statement = Statement::new(
