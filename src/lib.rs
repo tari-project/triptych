@@ -50,6 +50,8 @@
 //! functionality.
 //!
 //! ```
+//! # #[cfg(feature = "rand")]
+//! # {
 //! # extern crate alloc;
 //! use alloc::sync::Arc;
 //!
@@ -95,10 +97,11 @@
 //! let mut transcript = Transcript::new("Test transcript".as_bytes());
 //!
 //! // Generate a proof from the witness
-//! let proof = Proof::prove(&witness, &statement, &mut rng, &mut transcript.clone()).unwrap();
+//! let proof = Proof::prove(&witness, &statement, &mut transcript.clone()).unwrap();
 //!
 //! // The proof should verify against the same statement and transcript
 //! assert!(proof.verify(&statement, &mut transcript));
+//! # }
 //! ```
 
 #![no_std]
