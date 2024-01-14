@@ -35,6 +35,10 @@ There are several features that are enabled by default:
 - `serde`: adds proof serialization and deserialization
 - `std`: adds corresponding dependency features
 
+The underlying [curve library](https://crates.io/crates/curve25519-dalek) chooses an arithmetic backend based on CPU feature detection.
+Using a nightly compiler broadens the backend set, and may provide better performance.
+You can examine performance using the benchmarks: either `cargo bench` or `cargo +nightly bench`.
+
 ## Warning
 
 While this implementation is written with security in mind, it is currently **experimental** and not suitable for production use.
