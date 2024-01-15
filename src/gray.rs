@@ -1,3 +1,6 @@
+// Copyright (c) 2024, The Tari Project
+// SPDX-License-Identifier: BSD-3-Clause
+
 use alloc::{vec, vec::Vec};
 
 /// An iterator for arbitrary-base Gray codes.
