@@ -1,3 +1,6 @@
+// Copyright (c) 2024, The Tari Project
+// SPDX-License-Identifier: BSD-3-Clause
+
 use rand_core::{
     impls::{next_u32_via_fill, next_u64_via_fill},
     CryptoRng,
