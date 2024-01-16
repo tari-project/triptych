@@ -36,12 +36,16 @@
 //!
 //! There are several features that are enabled by default:
 //! - `rand`: adds additional prover functionality that supplies a cryptographically-secure random number generator
-//! - `serde`: adds proof serialization and deserialization
+//! - `serde`: adds proof serialization and deserialization via `serde`
 //! - `std`: adds corresponding dependency features
 //!
 //! The underlying [curve library](https://crates.io/crates/curve25519-dalek) chooses an arithmetic backend based on CPU feature detection.
 //! Using a nightly compiler broadens the backend set, and may provide better performance.
 //! You can examine performance using the benchmarks: either `cargo bench` or `cargo +nightly bench`.
+//!
+//! Proofs support a custom serialization format designed to be efficient and canonical.
+//! This functionality has an associated fuzzer that can be run using a nightly compiler: `cargo +nightly fuzz run
+//! proofs`
 //!
 //! # Warning
 //!

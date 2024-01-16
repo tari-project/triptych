@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 use alloc::{vec, vec::Vec};
-use core::{iter::once, slice};
+use core::{iter::once, slice, slice::ChunksExact};
 
 use curve25519_dalek::{
+    ristretto::CompressedRistretto,
     traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
     RistrettoPoint,
     Scalar,
@@ -23,10 +24,13 @@ use crate::{gray::GrayIterator, statement::Statement, util::NullRng, witness::Wi
 // Proof version flag
 const VERSION: u64 = 0;
 
+// Size of serialized proof elements in bytes
+const SERIALIZED_BYTES: usize = 32;
+
 /// A Triptych proof.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proof {
     A: RistrettoPoint,
     B: RistrettoPoint,
@@ -49,6 +53,9 @@ pub enum ProofError {
     /// A transcript challenge was invalid.
     #[snafu(display("A transcript challenge was invalid"))]
     InvalidChallenge,
+    /// Proof deserialization failed.
+    #[snafu(display("Proof deserialization failed"))]
+    FailedDeserialization,
 }
 
 /// Constant-time Kronecker delta function with scalar output.
@@ -665,6 +672,169 @@ impl Proof {
         // Perform the final check; this can be done in variable time since it holds no secrets
         RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points) == RistrettoPoint::identity()
     }
+
+    /// Serialize a proof to a canonical byte array.
+    #[allow(non_snake_case)]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut result = Vec::with_capacity(
+            8 // `n - 1`, `m`
+            + SERIALIZED_BYTES * (
+                4 // `A, B, C, D`
+                + self.X.len()
+                + self.Y.len()
+                + 3 // `z_A, z_C, z`
+                + self.f.len() * self.f[0].len()
+            ),
+        );
+        #[allow(clippy::cast_possible_truncation)]
+        let n_minus_1 = self.f[0].len() as u32;
+        #[allow(clippy::cast_possible_truncation)]
+        let m = self.f.len() as u32;
+        result.extend(n_minus_1.to_le_bytes());
+        result.extend(m.to_le_bytes());
+
+        result.extend_from_slice(self.A.compress().as_bytes());
+        result.extend_from_slice(self.B.compress().as_bytes());
+        result.extend_from_slice(self.C.compress().as_bytes());
+        result.extend_from_slice(self.D.compress().as_bytes());
+        result.extend_from_slice(self.z_A.as_bytes());
+        result.extend_from_slice(self.z_C.as_bytes());
+        result.extend_from_slice(self.z.as_bytes());
+        for X in &self.X {
+            result.extend_from_slice(X.compress().as_bytes());
+        }
+        for Y in &self.Y {
+            result.extend_from_slice(Y.compress().as_bytes());
+        }
+        for f_row in &self.f {
+            for f in f_row {
+                result.extend_from_slice(f.as_bytes());
+            }
+        }
+
+        result
+    }
+
+    /// Deserialize a proof from a canonical byte slice.
+    #[allow(non_snake_case)]
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProofError> {
+        // Helper to parse a `u32` from a `u8` iterator
+        let parse_u32 = |iter: &mut dyn Iterator<Item = &u8>| {
+            // Get the next four bytes
+            let bytes = iter.take(4).copied().collect::<Vec<u8>>();
+            if bytes.len() != 4 {
+                return Err(ProofError::FailedDeserialization);
+            }
+            let array: [u8; 4] = bytes.try_into().map_err(|_| ProofError::FailedDeserialization)?;
+
+            // Parse the bytes into a `u32`
+            Ok(u32::from_le_bytes(array))
+        };
+
+        // Helper to parse a scalar from a chunk iterator
+        let parse_scalar = |chunks: &mut ChunksExact<'_, u8>| -> Result<Scalar, ProofError> {
+            chunks
+                .next()
+                .ok_or(ProofError::FailedDeserialization)
+                .and_then(|slice| {
+                    let bytes: [u8; SERIALIZED_BYTES] =
+                        slice.try_into().map_err(|_| ProofError::FailedDeserialization)?;
+                    Option::<Scalar>::from(Scalar::from_canonical_bytes(bytes)).ok_or(ProofError::FailedDeserialization)
+                })
+        };
+
+        // Helper to parse a compressed point from a chunk iterator
+        let parse_point = |chunks: &mut ChunksExact<'_, u8>| -> Result<RistrettoPoint, ProofError> {
+            chunks
+                .next()
+                .ok_or(ProofError::FailedDeserialization)
+                .and_then(|slice| {
+                    let bytes: [u8; SERIALIZED_BYTES] =
+                        slice.try_into().map_err(|_| ProofError::FailedDeserialization)?;
+
+                    CompressedRistretto::from_slice(&bytes)
+                        .map_err(|_| ProofError::FailedDeserialization)?
+                        .decompress()
+                        .ok_or(ProofError::FailedDeserialization)
+                })
+        };
+
+        // Set up the slice iterator
+        let mut iter = bytes.iter();
+
+        // Parse the encoded vector dimensions and check that `n, m > 1` and that they do not overflow
+        let n_minus_1 = parse_u32(&mut iter)?;
+        if n_minus_1.checked_add(1).ok_or(ProofError::FailedDeserialization)? < 2 {
+            return Err(ProofError::FailedDeserialization);
+        }
+        let m = parse_u32(&mut iter)?;
+        if m < 2 {
+            return Err(ProofError::FailedDeserialization);
+        }
+
+        // The rest of the serialization is of encoded proof elements
+        let mut chunks = iter.as_slice().chunks_exact(SERIALIZED_BYTES);
+
+        // Extract the fixed proof elements
+        let A = parse_point(&mut chunks)?;
+        let B = parse_point(&mut chunks)?;
+        let C = parse_point(&mut chunks)?;
+        let D = parse_point(&mut chunks)?;
+        let z_A = parse_scalar(&mut chunks)?;
+        let z_C = parse_scalar(&mut chunks)?;
+        let z = parse_scalar(&mut chunks)?;
+
+        // Extract the `X` and `Y` vectors
+        let X = (0..m)
+            .map(|_| parse_point(&mut chunks))
+            .collect::<Result<Vec<RistrettoPoint>, ProofError>>()?;
+        let Y = (0..m)
+            .map(|_| parse_point(&mut chunks))
+            .collect::<Result<Vec<RistrettoPoint>, ProofError>>()?;
+
+        // Extract the `f` matrix
+        let f = (0..m)
+            .map(|_| {
+                (0..n_minus_1)
+                    .map(|_| parse_scalar(&mut chunks))
+                    .collect::<Result<Vec<Scalar>, ProofError>>()
+            })
+            .collect::<Result<Vec<Vec<Scalar>>, ProofError>>()?;
+
+        // Ensure no data is left over
+        if !chunks.remainder().is_empty() {
+            return Err(ProofError::FailedDeserialization);
+        }
+        if chunks.next().is_some() {
+            return Err(ProofError::FailedDeserialization);
+        }
+
+        // Perform a sanity check on all vectors
+        if X.len() != m as usize || Y.len() != m as usize {
+            return Err(ProofError::FailedDeserialization);
+        }
+        if f.len() != m as usize {
+            return Err(ProofError::FailedDeserialization);
+        }
+        for f_row in &f {
+            if f_row.len() != n_minus_1 as usize {
+                return Err(ProofError::FailedDeserialization);
+            }
+        }
+
+        Ok(Proof {
+            A,
+            B,
+            C,
+            D,
+            X,
+            Y,
+            f,
+            z_A,
+            z_C,
+            z,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -793,6 +963,28 @@ mod test {
         let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
             .unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]));
+    }
+
+    #[test]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_serialize_deserialize() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
+
+        // Generate and verify a proof
+        let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
+        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+
+        // Serialize the proof
+        let serialized = proof.to_bytes();
+
+        // Deserialize the proof
+        let deserialized = Proof::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, proof);
     }
 
     #[test]
