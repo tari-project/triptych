@@ -416,7 +416,7 @@ impl Proof {
         let first_statement = match statements.first() {
             Some(statement) => statement,
             None => {
-                return false;
+                return true;
             },
         };
 
@@ -1002,6 +1002,12 @@ mod test {
             .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
             .collect::<Vec<Proof>>();
         assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts));
+    }
+
+    #[test]
+    fn test_prove_verify_empty_batch() {
+        // An empty batch is valid by definition
+        assert!(Proof::verify_batch(&[], &[], &mut []));
     }
 
     #[test]
