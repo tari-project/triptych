@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 use alloc::{vec, vec::Vec};
+use core::num::NonZeroU32;
+
+use crypto_bigint::{NonZero, Uint};
 
 /// An iterator for arbitrary-base Gray codes.
 #[allow(non_snake_case)]
@@ -18,6 +21,9 @@ impl GrayIterator {
     ///
     /// You must provide a base `N > 1` and number of digits `M > 0` such that `N**M` does not overflow `u32`.
     /// If any of these conditions is not met, returns `None`.
+    ///
+    /// Operations using this iterator run in variable time, so don't use this for secret data.
+    /// If you need to get the Gray code decomposition for a secret value, use `decompose` directly.
     #[allow(non_snake_case)]
     pub fn new(N: u32, M: u32) -> Option<Self> {
         // Check inputs
@@ -34,23 +40,25 @@ impl GrayIterator {
         })
     }
 
-    /// Get a specific Gray code decomposition.
+    /// Get a specific Gray code decomposition, ignoring constant-time operations.
     ///
     /// You must provide a valid value `v` based on the supplied parameters `N` and `M`.
     /// If anything goes wrong, returns `None`.
     /// Otherwise, returns the Gray code as a `u32` digit vector.
     #[allow(non_snake_case)]
-    pub fn decompose(N: u32, M: u32, mut v: u32) -> Option<Vec<u32>> {
+    pub fn decompose_vartime(N: u32, M: u32, mut v: u32) -> Option<Vec<u32>> {
         if N <= 1 || M == 0 {
             return None;
         }
 
+        // Get a base-`N` decomposition
         let mut base_N = Vec::with_capacity(M as usize);
         for _ in 0..M {
             base_N.push(v % N);
             v /= N;
         }
 
+        // Now get the Gray decomposition from the base-`N` decomposition
         let mut shift = 0;
         let mut digits = vec![0; M as usize];
 
@@ -60,6 +68,55 @@ impl GrayIterator {
         }
 
         Some(digits)
+    }
+
+    /// Get a specific Gray code decomposition, attempting to do so in constant time.
+    ///
+    /// You must provide a valid value `v` based on the supplied parameters `N` and `M`.
+    /// If anything goes wrong, returns `None`.
+    /// Otherwise, returns the Gray code as a `u32` digit vector.
+    #[allow(non_snake_case)]
+    pub fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
+        type U32 = Uint<1>;
+
+        if N <= 1 || M == 0 {
+            return None;
+        }
+
+        // Each of these `u32` values can fit into a single-limb `Uint`, regardless of target
+        let mut v_U32 = U32::from_u32(v);
+        let N_nonzero = NonZero::<Uint<1>>::from_u32(NonZeroU32::new(N)?);
+
+        // Get a base-`N` decomposition in constant time
+        let mut base_N = Vec::with_capacity(M as usize);
+        for _ in 0..M {
+            let (q, r) = v_U32.div_rem(&N_nonzero);
+
+            base_N.push(r);
+            v_U32 = q;
+        }
+
+        // Now get the Gray decomposition from the base-`N` decomposition
+        let mut shift = U32::ZERO;
+        let mut digits = vec![U32::ZERO; M as usize];
+
+        for i in (0..M).rev() {
+            digits[i as usize] = base_N[i as usize].saturating_add(&shift).rem(&N_nonzero);
+            shift = shift.saturating_add(&N_nonzero).saturating_sub(&digits[i as usize]);
+        }
+
+        // On a 32-bit target, the single word is already `u32`
+        #[cfg(target_pointer_width = "32")]
+        let digits_u32 = digits.iter().map(|d| d.as_words()[0]).collect::<Vec<u32>>();
+
+        // On a 64-bit target, the single word is `u64`, but should not overflow `u32`
+        #[cfg(target_pointer_width = "64")]
+        let digits_u32 = digits
+            .iter()
+            .map(|d| u32::try_from(d.as_words()[0]).ok())
+            .collect::<Option<Vec<u32>>>()?;
+
+        Some(digits_u32)
     }
 }
 
@@ -90,7 +147,7 @@ impl Iterator for GrayIterator {
         }
 
         // Decompose the index
-        let next = Self::decompose(self.N, self.M, self.i)?;
+        let next = Self::decompose_vartime(self.N, self.M, self.i)?;
 
         // Locate the changed digit
         let index = self
@@ -137,6 +194,38 @@ mod test {
             assert_eq!(
                 digits,
                 GrayIterator::decompose(N, K, u32::try_from(i).unwrap()).unwrap()
+            );
+
+            // Make sure we haven't seen this decomposition before
+            assert!(!digits_seen.contains(&digits));
+            digits_seen.push(digits.clone());
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_gray_iterator_vartime() {
+        // Set up parameters
+        let N = 3u32;
+        let K = 2u32;
+
+        // Keep track of all digit vectors we've seen, since none should repeat
+        let mut digits_seen = Vec::new();
+
+        // Keep track of the digit vector
+        let mut digits = vec![0; K as usize];
+
+        for (i, (index, old, new)) in GrayIterator::new(N, K).unwrap().enumerate() {
+            // Ensure the old value is correct
+            assert_eq!(digits[index], old);
+
+            // Update the code according to the change data
+            digits[index] = new;
+
+            // Check against the value getter
+            assert_eq!(
+                digits,
+                GrayIterator::decompose_vartime(N, K, u32::try_from(i).unwrap()).unwrap()
             );
 
             // Make sure we haven't seen this decomposition before
