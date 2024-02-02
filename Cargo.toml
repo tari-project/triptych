@@ -11,18 +11,17 @@ categories = ["cryptography"]
 [dependencies]
 blake3 = { version = "1.5.0", default-features = false }
 curve25519-dalek = { version = "4.1.1", default-features = false, features = ["alloc", "digest", "rand_core", "zeroize"] }
-itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.12.0", default-features = false }
 merlin = { version = "3.0.0", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
-serde = { version = "1.0.195", optional = true, default-features = false, features = ["alloc", "derive"] }
+serde = { version = "1.0.195", optional = true, default-features = false, features = ["derive"] }
 snafu = { version = "0.8.0", default-features = false }
 subtle = { version = "2.5.0", default-features = false, features = ["core_hint_black_box"] }
-zeroize = { version = "1.7.0", default-features = false, features = ["alloc"] }
+zeroize = { version = "1.7.0", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", default-features = false, features = ["cargo_bench_support"] }
 rand_chacha = { version = "0.3.1", default-features = false }
-rand_core = { version = "0.6.4", default-features = false, features = ["getrandom"] }
 
 [features]
 default = ["rand", "serde", "std"]
