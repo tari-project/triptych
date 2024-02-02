@@ -227,8 +227,11 @@ impl Proof {
 
         // Compute the `B` matrix commitment
         let r_B = Scalar::random(&mut transcript_rng);
-        let l_decomposed =
-            GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?;
+        let l_decomposed = if vartime {
+            GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+        } else {
+            GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+        };
         let sigma = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
