@@ -99,7 +99,6 @@
 //!
 //! // Generate the statement, which includes the verification key vector and linking tag
 //! let J = witness.compute_linking_tag();
-//! let message = "This message will be bound to the proof".as_bytes();
 //! let statement = Statement::new(&params, &input_set, &J).unwrap();
 //!
 //! // Generate a transcript
