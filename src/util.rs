@@ -8,6 +8,15 @@ use rand_core::{
 };
 use zeroize::Zeroize;
 
+/// Options for constant- or variable-time operations.
+#[derive(Clone, Copy)]
+pub(crate) enum OperationTiming {
+    /// The operation should attempt to run in constant time
+    Constant,
+    /// The operation may run in variable time
+    Variable,
+}
+
 /// A null random number generator that exists only for deterministic transcript-based weight generation.
 /// It only produces zero.
 /// This is DANGEROUS in general, and you almost certainly should not use it elsewhere!

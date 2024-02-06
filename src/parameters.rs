@@ -13,6 +13,8 @@ use curve25519_dalek::{
 };
 use snafu::prelude::*;
 
+use crate::util::OperationTiming;
+
 /// Public parameters used for generating and verifying Triptych proofs.
 ///
 /// Parameters require a base and exponent that define the size of verification key vectors, as well as group generators
@@ -136,7 +138,7 @@ impl Parameters {
         &self,
         matrix: &[Vec<Scalar>],
         mask: &Scalar,
-        vartime: bool,
+        timing: OperationTiming,
     ) -> Result<RistrettoPoint, ParameterError> {
         // Check that the matrix dimensions are valid
         if matrix.len() != (self.m as usize) || matrix.iter().any(|m| m.len() != (self.n as usize)) {
@@ -147,10 +149,9 @@ impl Parameters {
         let scalars = matrix.iter().flatten().chain(once(mask)).collect::<Vec<&Scalar>>();
         let points = self.get_CommitmentG().iter().chain(once(self.get_CommitmentH()));
 
-        if vartime {
-            Ok(RistrettoPoint::vartime_multiscalar_mul(scalars, points))
-        } else {
-            Ok(RistrettoPoint::multiscalar_mul(scalars, points))
+        match timing {
+            OperationTiming::Constant => Ok(RistrettoPoint::multiscalar_mul(scalars, points)),
+            OperationTiming::Variable => Ok(RistrettoPoint::vartime_multiscalar_mul(scalars, points)),
         }
     }
 

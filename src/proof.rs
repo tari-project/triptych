@@ -19,7 +19,12 @@ use snafu::prelude::*;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
-use crate::{gray::GrayIterator, statement::Statement, util::NullRng, witness::Witness};
+use crate::{
+    gray::GrayIterator,
+    statement::Statement,
+    util::{NullRng, OperationTiming},
+    witness::Witness,
+};
 
 // Proof version flag
 const VERSION: u64 = 0;
@@ -110,7 +115,7 @@ impl Proof {
     ) -> Result<Self, ProofError> {
         use rand_core::OsRng;
 
-        Self::prove_internal(witness, statement, &mut OsRng, transcript, true)
+        Self::prove_internal(witness, statement, &mut OsRng, transcript, OperationTiming::Variable)
     }
 
     /// Generate a Triptych [`Proof`].
@@ -128,7 +133,7 @@ impl Proof {
         rng: &mut R,
         transcript: &mut Transcript,
     ) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, rng, transcript, true)
+        Self::prove_internal(witness, statement, rng, transcript, OperationTiming::Variable)
     }
 
     /// Generate a Triptych [`Proof`].
@@ -146,7 +151,7 @@ impl Proof {
     pub fn prove(witness: &Witness, statement: &Statement, transcript: &mut Transcript) -> Result<Self, ProofError> {
         use rand_core::OsRng;
 
-        Self::prove_internal(witness, statement, &mut OsRng, transcript, false)
+        Self::prove_internal(witness, statement, &mut OsRng, transcript, OperationTiming::Constant)
     }
 
     /// Generate a Triptych [`Proof`].
@@ -164,7 +169,7 @@ impl Proof {
         rng: &mut R,
         transcript: &mut Transcript,
     ) -> Result<Self, ProofError> {
-        Self::prove_internal(witness, statement, rng, transcript, false)
+        Self::prove_internal(witness, statement, rng, transcript, OperationTiming::Constant)
     }
 
     /// The actual prover functionality.
@@ -174,7 +179,7 @@ impl Proof {
         statement: &Statement,
         rng: &mut R,
         transcript: &mut Transcript,
-        vartime: bool,
+        timing: OperationTiming,
     ) -> Result<Self, ProofError> {
         // Check that the witness and statement have identical parameters
         if witness.get_params() != statement.get_params() {
@@ -223,15 +228,17 @@ impl Proof {
             a[j][0] = -a[j][1..].iter().sum::<Scalar>();
         }
         let A = params
-            .commit_matrix(&a, &r_A, vartime)
+            .commit_matrix(&a, &r_A, timing)
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `B` matrix commitment
         let r_B = Scalar::random(&mut transcript_rng);
-        let l_decomposed = if vartime {
-            GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
-        } else {
-            GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+        let l_decomposed = match timing {
+            OperationTiming::Constant => {
+                GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+            },
+            OperationTiming::Variable => GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l)
+                .ok_or(ProofError::InvalidParameter)?,
         };
         let sigma = (0..params.get_m())
             .map(|j| {
@@ -241,7 +248,7 @@ impl Proof {
             })
             .collect::<Vec<Vec<Scalar>>>();
         let B = params
-            .commit_matrix(&sigma, &r_B, vartime)
+            .commit_matrix(&sigma, &r_B, timing)
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `C` matrix commitment
@@ -255,7 +262,7 @@ impl Proof {
             })
             .collect::<Vec<Vec<Scalar>>>();
         let C = params
-            .commit_matrix(&a_sigma, &r_C, vartime)
+            .commit_matrix(&a_sigma, &r_C, timing)
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `D` matrix commitment
@@ -268,7 +275,7 @@ impl Proof {
             })
             .collect::<Vec<Vec<Scalar>>>();
         let D = params
-            .commit_matrix(&a_square, &r_D, vartime)
+            .commit_matrix(&a_square, &r_D, timing)
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Random masks
@@ -327,10 +334,9 @@ impl Proof {
                 let X_points = M.iter().chain(once(params.get_G()));
                 let X_scalars = p.iter().map(|p| &p[j]).chain(once(rho));
 
-                if vartime {
-                    RistrettoPoint::vartime_multiscalar_mul(X_scalars, X_points)
-                } else {
-                    RistrettoPoint::multiscalar_mul(X_scalars, X_points)
+                match timing {
+                    OperationTiming::Constant => RistrettoPoint::multiscalar_mul(X_scalars, X_points),
+                    OperationTiming::Variable => RistrettoPoint::vartime_multiscalar_mul(X_scalars, X_points),
                 }
             })
             .collect::<Vec<RistrettoPoint>>();
