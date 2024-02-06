@@ -193,8 +193,21 @@ impl Proof {
         let params = statement.get_params();
         let J = statement.get_J();
 
-        // Check that the witness is valid against the statement
-        if M.get(l as usize).ok_or(ProofError::InvalidParameter)? != &(r * params.get_G()) {
+        // Check that the witness is valid against the statement, in constant time if needed
+        let mut M_l = RistrettoPoint::identity();
+
+        match timing {
+            OperationTiming::Constant => {
+                for (index, item) in M.iter().enumerate() {
+                    M_l.conditional_assign(item, index.ct_eq(&(l as usize)));
+                }
+            },
+            OperationTiming::Variable => {
+                M_l = M[l as usize];
+            },
+        }
+
+        if M_l != r * params.get_G() {
             return Err(ProofError::InvalidParameter);
         }
         if &(r * J) != params.get_U() {
