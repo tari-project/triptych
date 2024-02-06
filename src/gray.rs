@@ -8,7 +8,7 @@ use crypto_bigint::{NonZero, Uint};
 
 /// An iterator for arbitrary-base Gray codes.
 #[allow(non_snake_case)]
-pub struct GrayIterator {
+pub(crate) struct GrayIterator {
     N: u32, // base
     M: u32, // number of digits
     // state information
@@ -25,7 +25,7 @@ impl GrayIterator {
     /// Operations using this iterator run in variable time, so don't use this for secret data.
     /// If you need to get the Gray code decomposition for a secret value, use `decompose` directly.
     #[allow(non_snake_case)]
-    pub fn new(N: u32, M: u32) -> Option<Self> {
+    pub(crate) fn new(N: u32, M: u32) -> Option<Self> {
         // Check inputs
         if N <= 1 || M == 0 {
             return None;
@@ -46,7 +46,7 @@ impl GrayIterator {
     /// If anything goes wrong, returns `None`.
     /// Otherwise, returns the Gray code as a `u32` digit vector.
     #[allow(non_snake_case)]
-    pub fn decompose_vartime(N: u32, M: u32, mut v: u32) -> Option<Vec<u32>> {
+    pub(crate) fn decompose_vartime(N: u32, M: u32, mut v: u32) -> Option<Vec<u32>> {
         if N <= 1 || M == 0 {
             return None;
         }
@@ -76,7 +76,7 @@ impl GrayIterator {
     /// If anything goes wrong, returns `None`.
     /// Otherwise, returns the Gray code as a `u32` digit vector.
     #[allow(non_snake_case)]
-    pub fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
+    pub(crate) fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
         type U32 = Uint<1>;
 
         if N <= 1 || M == 0 {
