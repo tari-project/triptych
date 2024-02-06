@@ -21,7 +21,7 @@ pub struct InputSet {
 }
 
 impl InputSet {
-    /// Generate a new input set from a slice `M` of verification keys.
+    /// Generate a new [`InputSet`] from a slice `M` of verification keys.
     #[allow(non_snake_case)]
     pub fn new(M: &[RistrettoPoint]) -> Self {
         // Use `BLAKE3` for the transcript hash
@@ -37,12 +37,12 @@ impl InputSet {
         }
     }
 
-    /// Get the verification keys for this input set.
+    /// Get the verification keys for this [`InputSet`].
     pub fn get_keys(&self) -> &[RistrettoPoint] {
         &self.M
     }
 
-    /// Get a cryptographic hash representation of this input set, suitable for transcripting.
+    /// Get a cryptographic hash representation of this [`InputSet`], suitable for transcripting.
     pub(crate) fn get_hash(&self) -> &[u8] {
         &self.hash
     }
@@ -50,8 +50,8 @@ impl InputSet {
 
 /// A Triptych proof statement.
 ///
-/// The statement consists of an input set of verification keys and a linking tag.
-/// It also contains parameters that, among other things, enforce the size of the input set.
+/// The statement consists of an [`InputSet`] of verification keys and a linking tag.
+/// It also contains [`Parameters`] that, among other things, enforce the size of the [`InputSet`].
 #[allow(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
 pub struct Statement {
@@ -60,7 +60,7 @@ pub struct Statement {
     J: RistrettoPoint,
 }
 
-/// Errors that can arise relating to `Statement`.
+/// Errors that can arise relating to [`Statement`].
 #[derive(Debug, Snafu)]
 pub enum StatementError {
     /// An invalid parameter was provided.
@@ -69,13 +69,15 @@ pub enum StatementError {
 }
 
 impl Statement {
-    /// Generate a new Triptych proof statement.
+    /// Generate a new [`Statement`].
     ///
-    /// The input set `input_set` must have a verification key vector whose size matches that specified by the
-    /// parameters `params`, and which does not contain the identity group element.
-    /// If either of these conditions is not met, returns an error.
+    /// The [`InputSet`] `input_set` must have a verification key vector whose size matches that specified by the
+    /// [`Parameters`] `params`, and which does not contain the identity group element.
+    /// If either of these conditions is not met, returns a [`StatementError`].
     ///
-    /// The linking tag `J` is assumed to have been computed from witness data or otherwise provided externally.
+    /// The linking tag `J` is assumed to have been computed from
+    /// [`Witness::compute_linking_tag`](`crate::witness::Witness::compute_linking_tag`) data or otherwise provided
+    /// externally.
     #[allow(non_snake_case)]
     pub fn new(
         params: &Arc<Parameters>,
@@ -97,17 +99,17 @@ impl Statement {
         })
     }
 
-    /// Get the parameters for this statement.
+    /// Get the parameters for this [`Statement`].
     pub fn get_params(&self) -> &Arc<Parameters> {
         &self.params
     }
 
-    /// Get the input set for this statement.
+    /// Get the input set for this [`Statement`].
     pub fn get_input_set(&self) -> &Arc<InputSet> {
         &self.input_set
     }
 
-    /// Get the linking tag for this statement.
+    /// Get the linking tag for this [`Statement`].
     #[allow(non_snake_case)]
     pub fn get_J(&self) -> &RistrettoPoint {
         &self.J
