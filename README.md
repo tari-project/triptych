@@ -41,7 +41,7 @@ Note that nightly compilers after `nightly-2024-02-04` will [not work](https://g
 You can examine performance using the benchmarks: either `cargo bench` or `cargo +nightly-2024-02-04 bench`.
 
 Proofs support a custom serialization format designed to be efficient and canonical.
-This functionality has an associated fuzzer that can be run using a nightly compiler: `cargo +nightly-2024-02-04 fuzz run proofs`
+This functionality has an associated fuzzer that can be run using a nightly compiler: `cargo +nightly-2024-02-04 fuzz run proofs`.
 
 ## Warning
 

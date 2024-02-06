@@ -16,8 +16,8 @@ use snafu::prelude::*;
 /// Public parameters used for generating and verifying Triptych proofs.
 ///
 /// Parameters require a base and exponent that define the size of verification key vectors, as well as group generators
-/// `G` and `U` required by the protocol. You can either use `new` to have these generators defined securely for you, or
-/// use `new_with_generators` if your use case requires specific values for these.
+/// `G` and `U` required by the protocol. You can either use [`Parameters::new`] to have these generators defined
+/// securely for you, or use [`Parameters::new_with_generators`] if your use case requires specific values for these.
 #[allow(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
 pub struct Parameters {
@@ -30,7 +30,7 @@ pub struct Parameters {
     hash: Vec<u8>,
 }
 
-/// Errors that can arise relating to `Parameters`.
+/// Errors that can arise relating to [`Parameters`].
 #[derive(Debug, Snafu)]
 pub enum ParameterError {
     /// An invalid parameter was provided.
@@ -39,13 +39,13 @@ pub enum ParameterError {
 }
 
 impl Parameters {
-    /// Generate new parameters for Triptych proofs.
+    /// Generate new [`Parameters`] for Triptych proofs.
     ///
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
-    /// `n**m` does not overflow `u32`. If any of these conditions is not met, returns an error.
+    /// `n**m` does not overflow [`prim@u32`]. If any of these conditions is not met, returns a [`ParameterError`].
     ///
     /// This function produces group generators `G` and `U` for you.
-    /// If your use case requires specific generators, use `new_with_generators` instead.
+    /// If your use case requires specific generators, use [`Parameters::new_with_generators`] instead.
     #[allow(non_snake_case)]
     pub fn new(n: u32, m: u32) -> Result<Self, ParameterError> {
         // Use the default base point for `G` (this is arbitrary)
@@ -61,17 +61,17 @@ impl Parameters {
         Self::new_with_generators(n, m, &G, &U)
     }
 
-    /// Generate new parameters for Triptych proofs.
+    /// Generate new [`Parameters`] for Triptych proofs.
     ///
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
-    /// `n**m` does not overflow `u32`. If any of these conditions is not met, returns an error.
+    /// `n**m` does not overflow [`prim@u32`]. If any of these conditions is not met, returns a [`ParameterError`].
     ///
     /// You must also provide independent group generators `G` and `U`:
     /// - The generator `G` is used to define verification keys.
     /// - The generator `U` is used to define linking tags.
     ///
     /// The security of these generators cannot be checked by this function.
-    /// If you'd rather have the generators securely defined for you, use `new` instead.
+    /// If you'd rather have the generators securely defined for you, use [`Parameters::new`] instead.
     #[allow(non_snake_case)]
     pub fn new_with_generators(n: u32, m: u32, G: &RistrettoPoint, U: &RistrettoPoint) -> Result<Self, ParameterError> {
         // These bounds are required by the protocol
@@ -154,7 +154,7 @@ impl Parameters {
         }
     }
 
-    /// Get the group generator `G` from these parameters.
+    /// Get the group generator `G` from these [`Parameters`].
     ///
     /// This is the generator used for defining verification keys.
     #[allow(non_snake_case)]
@@ -162,7 +162,7 @@ impl Parameters {
         &self.G
     }
 
-    /// Get the group generator `U` from these parameters.
+    /// Get the group generator `U` from these [`Parameters`].
     ///
     /// This is the generator used for defining linking tags.
     #[allow(non_snake_case)]
@@ -170,21 +170,21 @@ impl Parameters {
         &self.U
     }
 
-    /// Get the value `n` from these parameters.
+    /// Get the value `n` from these [`Parameters`].
     ///
     /// This is the base used for defining the verification key vector size.
     pub fn get_n(&self) -> u32 {
         self.n
     }
 
-    /// Get the value `m` from these parameters.
+    /// Get the value `m` from these [`Parameters`].
     ///
     /// This is the exponent used for defining the verification key vector size.
     pub fn get_m(&self) -> u32 {
         self.m
     }
 
-    /// Get the value `N == n**m` from these parameters.
+    /// Get the value `N == n**m` from these [`Parameters`].
     ///
     /// This is the verification key vector size.
     #[allow(non_snake_case)]
@@ -193,19 +193,19 @@ impl Parameters {
         self.n.pow(self.m)
     }
 
-    /// Get the value `CommitmentG` from these parameters.
+    /// Get the value `CommitmentG` from these [`Parameters`].
     #[allow(non_snake_case)]
     pub(crate) fn get_CommitmentG(&self) -> &Vec<RistrettoPoint> {
         &self.CommitmentG
     }
 
-    /// Get the value `CommitmentH` from these parameters.
+    /// Get the value `CommitmentH` from these [`Parameters`].
     #[allow(non_snake_case)]
     pub(crate) fn get_CommitmentH(&self) -> &RistrettoPoint {
         &self.CommitmentH
     }
 
-    /// Get a cryptographic hash representation of these parameters, suitable for transcripting.
+    /// Get a cryptographic hash representation of these [`Parameters`], suitable for transcripting.
     pub(crate) fn get_hash(&self) -> &[u8] {
         &self.hash
     }

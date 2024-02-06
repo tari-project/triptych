@@ -12,8 +12,9 @@ use crate::parameters::Parameters;
 
 /// A Triptych proof witness.
 ///
-/// The witness consists of a signing key and an index where the corresponding verification key will appear in a proof
-/// statement verification key vector. It also contains a set of parameters.
+/// The witness consists of a signing key and an index where the corresponding verification key will appear in  the
+/// [`InputSet`](`crate::statement::InputSet`) of a [`Statement`](`crate::statement::Statement`). It also contains
+/// [`Parameters`].
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Witness {
     #[zeroize(skip)]
@@ -22,7 +23,7 @@ pub struct Witness {
     r: Scalar,
 }
 
-/// Errors that can arise relating to `Witness`.
+/// Errors that can arise relating to [`Witness`].
 #[derive(Debug, Snafu)]
 pub enum WitnessError {
     /// An invalid parameter was provided.
@@ -31,12 +32,12 @@ pub enum WitnessError {
 }
 
 impl Witness {
-    /// Generate a new Triptych proof witness from secret data.
+    /// Generate a new [`Witness`] from secret data.
     ///
-    /// The signing key `r` must be nonzero, and the index `l` must be valid for the parameters `params`.
-    /// If any of these conditions is not met, returns an error.
+    /// The signing key `r` must be nonzero, and the index `l` must be valid for the [`Parameters`] `params`.
+    /// If any of these conditions is not met, returns a [`WitnessError`].
     ///
-    /// If you'd like a witness generated securely for you, use `random` instead.
+    /// If you'd like a [`Witness`] generated securely for you, use [`Witness::random`] instead.
     #[allow(non_snake_case)]
     pub fn new(params: &Arc<Parameters>, l: u32, r: &Scalar) -> Result<Self, WitnessError> {
         if r == &Scalar::ZERO {
@@ -53,12 +54,12 @@ impl Witness {
         })
     }
 
-    /// Generate a new random Triptych proof witness.
+    /// Generate a new random [`Witness`].
     ///
-    /// You must provide parameters `params` and a cryptographically-secure random number generator `rng`.
-    /// This will generate a witness with a cryptographically-secure signing key and random index.
+    /// You must provide [`Parameters`] `params` and a [`CryptoRngCore`] random number generator `rng`.
+    /// This will generate a [`Witness`] with a cryptographically-secure signing key and random index.
     ///
-    /// If you'd rather provide your own secret data, use `new` instead.
+    /// If you'd rather provide your own secret data, use [`Witness::new`] instead.
     #[allow(clippy::cast_possible_truncation)]
     pub fn random<R: CryptoRngCore>(params: &Arc<Parameters>, rng: &mut R) -> Self {
         // Generate a random index using wide reduction
@@ -72,28 +73,28 @@ impl Witness {
         }
     }
 
-    /// Get the parameters from this witness.
+    /// Get the [`Parameters`] from this [`Witness`].
     pub fn get_params(&self) -> &Arc<Parameters> {
         &self.params
     }
 
-    /// Get the index from this witness.
+    /// Get the index from this [`Witness`].
     pub fn get_l(&self) -> u32 {
         self.l
     }
 
-    /// Get the signing key from this witness.
+    /// Get the signing key from this [`Witness`].
     pub fn get_r(&self) -> &Scalar {
         &self.r
     }
 
-    /// Compute the linking tag for the witness signing key.
+    /// Compute the linking tag for the [`Witness`] signing key.
     #[allow(non_snake_case)]
     pub fn compute_linking_tag(&self) -> RistrettoPoint {
         *Zeroizing::new(self.r.invert()) * self.params.get_U()
     }
 
-    /// Compute the verification key for the witness signing key.
+    /// Compute the verification key for the [`Witness`] signing key.
     pub fn compute_verification_key(&self) -> RistrettoPoint {
         self.r * self.params.get_G()
     }
