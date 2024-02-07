@@ -14,7 +14,7 @@ use crate::parameters::Parameters;
 /// An input set is constructed from a vector of verification keys.
 /// Internally, it also contains cryptographic hash data to make proofs more efficient.
 #[allow(non_snake_case)]
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InputSet {
     M: Vec<RistrettoPoint>,
     hash: Vec<u8>,
@@ -35,6 +35,28 @@ impl InputSet {
             M: M.to_vec(),
             hash: hasher.finalize().as_bytes().to_vec(),
         }
+    }
+
+    /// Generate a new padded [`InputSet`] from a slice `M` of verification keys and [`Parameters`] `params`.
+    ///
+    /// If the verification key vector is shorter than specified by `params`, it will be padded by repeating the last
+    /// element. If your use case cannot safely allow this, use [`InputSet::new`] instead.
+    ///
+    /// If the verification key vector is empty or longer than specified by `params`, returns a [`StatementError`].
+    #[allow(non_snake_case)]
+    pub fn new_with_padding(M: &[RistrettoPoint], params: &Parameters) -> Result<Self, StatementError> {
+        // We cannot have the vector be too long
+        if M.len() > params.get_N() as usize {
+            return Err(StatementError::InvalidParameter);
+        }
+
+        // Get the last element, which also ensures the vector is nonempty
+        let last = M.last().ok_or(StatementError::InvalidParameter)?;
+
+        // Pad the vector with the last element
+        let mut M_padded = M.to_vec();
+        M_padded.resize(params.get_N() as usize, *last);
+        Ok(Self::new(&M_padded))
     }
 
     /// Get the verification keys for this [`InputSet`].
@@ -113,5 +135,53 @@ impl Statement {
     #[allow(non_snake_case)]
     pub fn get_J(&self) -> &RistrettoPoint {
         &self.J
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::{borrow::ToOwned, vec::Vec};
+
+    use curve25519_dalek::RistrettoPoint;
+    use rand_chacha::ChaCha12Rng;
+    use rand_core::SeedableRng;
+
+    use crate::{parameters::Parameters, statement::InputSet};
+
+    // Helper function to generate random vectors
+    fn random_vector(size: usize) -> Vec<RistrettoPoint> {
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+
+        (0..size)
+            .map(|_| RistrettoPoint::random(&mut rng))
+            .collect::<Vec<RistrettoPoint>>()
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_padding() {
+        // Generate parameters
+        let params = Parameters::new(2, 4).unwrap();
+        let N = params.get_N() as usize;
+
+        // Vector is empty
+        assert!(InputSet::new_with_padding(&[], &params).is_err());
+
+        // Vector is too long
+        let M = random_vector(N + 1);
+        assert!(InputSet::new_with_padding(&M, &params).is_err());
+
+        // Vector is the right size
+        let M = random_vector(N);
+        assert_eq!(InputSet::new_with_padding(&M, &params).unwrap(), InputSet::new(&M));
+
+        // Vector is padded
+        let M = random_vector(N - 1);
+        let mut M_padded = M.clone();
+        M_padded.push(M.last().unwrap().to_owned());
+        assert_eq!(
+            InputSet::new_with_padding(&M, &params).unwrap(),
+            InputSet::new(&M_padded)
+        );
     }
 }
