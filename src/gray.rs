@@ -4,7 +4,7 @@
 use alloc::{vec, vec::Vec};
 use core::num::NonZeroU32;
 
-use crypto_bigint::{NonZero, Uint};
+use crypto_bigint::{NonZero, U64};
 
 /// An iterator for arbitrary-base Gray codes.
 #[allow(non_snake_case)]
@@ -77,46 +77,37 @@ impl GrayIterator {
     /// Otherwise, returns the Gray code as a `u32` digit vector.
     #[allow(non_snake_case)]
     pub(crate) fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
-        type U32 = Uint<1>;
-
         if N <= 1 || M == 0 {
             return None;
         }
 
-        // Each of these `u32` values can fit into a single-limb `Uint`, regardless of target
-        let mut v_U32 = U32::from_u32(v);
-        let N_nonzero = NonZero::<Uint<1>>::from_u32(NonZeroU32::new(N)?);
+        // Convert to constant-time-friendly `U64`
+        let mut v_U64 = U64::from_u32(v);
+        let N_nonzero = NonZero::<U64>::from_u32(NonZeroU32::new(N)?);
 
         // Get a base-`N` decomposition in constant time
         let mut base_N = Vec::with_capacity(M as usize);
         for _ in 0..M {
-            let (q, r) = v_U32.div_rem(&N_nonzero);
+            let (q, r) = v_U64.div_rem(&N_nonzero);
 
             base_N.push(r);
-            v_U32 = q;
+            v_U64 = q;
         }
 
         // Now get the Gray decomposition from the base-`N` decomposition
-        let mut shift = U32::ZERO;
-        let mut digits = vec![U32::ZERO; M as usize];
+        let mut shift = U64::ZERO;
+        let mut digits = vec![U64::ZERO; M as usize];
 
         for i in (0..M).rev() {
             digits[i as usize] = base_N[i as usize].saturating_add(&shift).rem(&N_nonzero);
             shift = shift.saturating_add(&N_nonzero).saturating_sub(&digits[i as usize]);
         }
 
-        // On a 32-bit target, the single word is already `u32`
-        #[cfg(target_pointer_width = "32")]
-        let digits_u32 = digits.iter().map(|d| d.as_words()[0]).collect::<Vec<u32>>();
-
-        // On a 64-bit target, the single word is `u64`, but should not overflow `u32`
-        #[cfg(target_pointer_width = "64")]
-        let digits_u32 = digits
+        // Get the digits as `u32`
+        digits
             .iter()
-            .map(|d| u32::try_from(d.as_words()[0]).ok())
-            .collect::<Option<Vec<u32>>>()?;
-
-        Some(digits_u32)
+            .map(|d| u32::try_from(u64::from(*d)).ok())
+            .collect::<Option<Vec<u32>>>()
     }
 }
 
