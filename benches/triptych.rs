@@ -29,6 +29,7 @@ const BATCH_SIZES: [usize; 1] = [2];
 
 // Generate a batch of witnesses, statements, and transcripts
 #[allow(non_snake_case)]
+#[allow(clippy::arithmetic_side_effects)]
 fn generate_data<R: CryptoRngCore>(
     params: &Arc<Parameters>,
     b: usize,
@@ -166,7 +167,7 @@ fn verify_proof(c: &mut Criterion) {
                     || transcripts[0].clone(),
                     |t| {
                         // Verify the proof
-                        assert!(proof.verify(&statements[0], t));
+                        assert!(proof.verify(&statements[0], t).is_ok());
                     },
                     BatchSize::SmallInput,
                 )
@@ -209,7 +210,7 @@ fn verify_batch_proof(c: &mut Criterion) {
                         || transcripts.clone(),
                         |t| {
                             // Verify the proofs in a batch
-                            assert!(Proof::verify_batch(&statements, &proofs, t));
+                            assert!(Proof::verify_batch(&statements, &proofs, t).is_ok());
                         },
                         BatchSize::SmallInput,
                     )

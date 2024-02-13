@@ -100,7 +100,7 @@ impl Parameters {
         hasher.update(&m.to_le_bytes());
         let mut hasher_xof = hasher.finalize_xof();
         let mut CommitmentG_bytes = [0u8; 64];
-        let CommitmentG = (0..n * m)
+        let CommitmentG = (0..n.checked_mul(m).ok_or(ParameterError::InvalidParameter)?)
             .map(|_| {
                 hasher_xof.fill(&mut CommitmentG_bytes);
                 RistrettoPoint::from_uniform_bytes(&CommitmentG_bytes)

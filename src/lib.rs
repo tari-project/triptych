@@ -103,7 +103,7 @@
 //! let proof = Proof::prove(&witness, &statement, &mut transcript.clone()).unwrap();
 //!
 //! // The proof should verify against the same statement and transcript
-//! assert!(proof.verify(&statement, &mut transcript));
+//! assert!(proof.verify(&statement, &mut transcript).is_ok());
 //! # }
 //! ```
 
