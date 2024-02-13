@@ -61,6 +61,9 @@ pub enum ProofError {
     /// Proof deserialization failed.
     #[snafu(display("Proof deserialization failed"))]
     FailedDeserialization,
+    /// Proof verification failed.
+    #[snafu[display("Proof verification failed")]]
+    FailedVerification,
 }
 
 /// Constant-time Kronecker delta function with scalar output.
@@ -81,7 +84,7 @@ fn xi_powers(transcript: &mut Transcript, m: u32) -> Result<Vec<Scalar>, ProofEr
     let xi = Scalar::from_bytes_mod_order_wide(&xi_bytes);
 
     // Get powers of the challenge and confirm they are nonzero
-    let mut xi_powers = Vec::with_capacity(m as usize + 1);
+    let mut xi_powers = Vec::with_capacity((m as usize).checked_add(1).ok_or(ProofError::InvalidParameter)?);
     let mut xi_power = Scalar::ONE;
     for _ in 0..=m {
         if xi_power == Scalar::ZERO {
@@ -308,7 +311,12 @@ impl Proof {
 
             // Set the initial coefficients using the first degree-one polynomial (`j = 0`)
             let mut coefficients = Vec::new();
-            coefficients.resize(params.get_m() as usize + 1, Scalar::ZERO);
+            coefficients.resize(
+                (params.get_m() as usize)
+                    .checked_add(1)
+                    .ok_or(ProofError::InvalidParameter)?,
+                Scalar::ZERO,
+            );
             coefficients[0] = a[0][k_decomposed[0] as usize];
             coefficients[1] = sigma[0][k_decomposed[0] as usize];
 
@@ -408,9 +416,8 @@ impl Proof {
     ///
     /// Verification requires that the `statement` and `transcript` match those used when the proof was generated.
     ///
-    /// Returns a [`prim@bool`] that is [`prim@true`] if and only if the above requirement is met and the proof is
-    /// valid.
-    pub fn verify(&self, statement: &Statement, transcript: &mut Transcript) -> bool {
+    /// If this requirement is not met, or if the proof is invalid, returns a [`ProofError`].
+    pub fn verify(&self, statement: &Statement, transcript: &mut Transcript) -> Result<(), ProofError> {
         // Verify as a trivial batch
         Self::verify_batch(
             slice::from_ref(statement),
@@ -425,25 +432,24 @@ impl Proof {
     /// and that they share a common [`InputSet`](`crate::statement::InputSet`) and
     /// [`Parameters`](`crate::parameters::Parameters`).
     ///
-    /// Returns a [`prim@bool`] that is [`prim@true`] if and only if the above requirements are met and each proof is
-    /// valid. If the batch is empty, returns [`prim@true`].
+    /// If any of the above requirements are not met, or if the batch is empty, or if any proof is invalid, returns a
+    /// [`ProofError`].
     #[allow(clippy::too_many_lines, non_snake_case)]
-    pub fn verify_batch(statements: &[Statement], proofs: &[Proof], transcripts: &mut [Transcript]) -> bool {
+    pub fn verify_batch(
+        statements: &[Statement],
+        proofs: &[Proof],
+        transcripts: &mut [Transcript],
+    ) -> Result<(), ProofError> {
         // Check that we have the same number of statements, proofs, and transcripts
         if statements.len() != proofs.len() {
-            return false;
+            return Err(ProofError::InvalidParameter);
         }
         if statements.len() != transcripts.len() {
-            return false;
+            return Err(ProofError::InvalidParameter);
         }
 
-        // An empty batch is considered trivially valid
-        let first_statement = match statements.first() {
-            Some(statement) => statement,
-            None => {
-                return true;
-            },
-        };
+        // An empty batch is considered trivially invalid
+        let first_statement = statements.first().ok_or(ProofError::InvalidParameter)?;
 
         // Each statement must use the same input set (checked using the hash for efficiency)
         if !statements
@@ -451,7 +457,7 @@ impl Proof {
             .map(|s| s.get_input_set().get_hash())
             .all(|h| h == first_statement.get_input_set().get_hash())
         {
-            return false;
+            return Err(ProofError::InvalidParameter);
         }
 
         // Each statement must use the same parameters (checked using the hash for efficiency)
@@ -460,7 +466,7 @@ impl Proof {
             .map(|s| s.get_params().get_hash())
             .all(|h| h == first_statement.get_params().get_hash())
         {
-            return false;
+            return Err(ProofError::InvalidParameter);
         }
 
         // Extract common values for convenience
@@ -470,29 +476,27 @@ impl Proof {
         // Check that all proof semantics are valid for the statement
         for proof in proofs {
             if proof.X.len() != params.get_m() as usize {
-                return false;
+                return Err(ProofError::InvalidParameter);
             }
             if proof.Y.len() != params.get_m() as usize {
-                return false;
+                return Err(ProofError::InvalidParameter);
             }
             if proof.f.len() != params.get_m() as usize {
-                return false;
+                return Err(ProofError::InvalidParameter);
             }
             for f_row in &proof.f {
-                if f_row.len() != (params.get_n() - 1) as usize {
-                    return false;
+                if f_row.len() != params.get_n().checked_sub(1).ok_or(ProofError::InvalidParameter)? as usize {
+                    return Err(ProofError::InvalidParameter);
                 }
             }
         }
 
         // Determine the size of the final check vector, which must not overflow `usize`
-        let batch_size = match u32::try_from(proofs.len()) {
-            Ok(batch) => batch,
-            _ => {
-                return false;
-            },
-        };
-        let final_size = match usize::try_from(
+        let batch_size = u32::try_from(proofs.len()).map_err(|_| ProofError::InvalidParameter)?;
+
+        // This is unlikely to overflow; even if it does, the only effect is unnecessary reallocation
+        #[allow(clippy::arithmetic_side_effects)]
+        let final_size = usize::try_from(
             1 // G
             + params.get_n() * params.get_m() // CommitmentG
             + 1 // CommitmentH
@@ -503,12 +507,8 @@ impl Proof {
                 + 1 // J
                 + 2 * params.get_m() // X, Y
             ),
-        ) {
-            Ok(size) => size,
-            _ => {
-                return false;
-            },
-        };
+        )
+        .map_err(|_| ProofError::InvalidParameter)?;
 
         // Set up the point vector for the final check
         let points = proofs
@@ -565,13 +565,7 @@ impl Proof {
             }
 
             // Get challenge powers
-            let xi_powers = match xi_powers(transcript, params.get_m()) {
-                Ok(xi_powers) => xi_powers,
-                _ => {
-                    return false;
-                },
-            };
-
+            let xi_powers = xi_powers(transcript, params.get_m())?;
             xi_powers_all.push(xi_powers);
 
             // Finish the transcript for pseudorandom number generation
@@ -606,7 +600,7 @@ impl Proof {
             // Check that `f` does not contain zero, which breaks batch inversion
             for f_row in &f {
                 if f_row.contains(&Scalar::ZERO) {
-                    return false;
+                    return Err(ProofError::InvalidParameter);
                 }
             }
 
@@ -666,11 +660,8 @@ impl Proof {
 
             // Set up the initial `f` product and Gray iterator
             let mut f_product = f.iter().map(|f_row| f_row[0]).product::<Scalar>();
-            let gray_iterator = if let Some(gray_iterator) = GrayIterator::new(params.get_n(), params.get_m()) {
-                gray_iterator
-            } else {
-                return false;
-            };
+            let gray_iterator =
+                GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?;
 
             // Invert each element of `f` for efficiency
             let mut f_inverse_flat = f.iter().flatten().copied().collect::<Vec<Scalar>>();
@@ -701,12 +692,18 @@ impl Proof {
         scalars.push(U_scalar);
 
         // Perform the final check; this can be done in variable time since it holds no secrets
-        RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points) == RistrettoPoint::identity()
+        if RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points) == RistrettoPoint::identity() {
+            Ok(())
+        } else {
+            Err(ProofError::FailedVerification)
+        }
     }
 
     /// Serialize a [`Proof`] to a canonical byte vector.
     #[allow(non_snake_case)]
     pub fn to_bytes(&self) -> Vec<u8> {
+        // This cannot overflow
+        #[allow(clippy::arithmetic_side_effects)]
         let mut result = Vec::with_capacity(
             8 // `n - 1`, `m`
             + SERIALIZED_BYTES * (
@@ -889,6 +886,7 @@ mod test {
 
     // Generate a batch of witnesses, statements, and transcripts
     #[allow(non_snake_case)]
+    #[allow(clippy::arithmetic_side_effects)]
     fn generate_data<R: CryptoRngCore>(
         n: u32,
         m: u32,
@@ -950,7 +948,7 @@ mod test {
 
         // Generate and verify a proof
         let proof = Proof::prove(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
     }
 
     #[test]
@@ -965,7 +963,7 @@ mod test {
         // Generate and verify a proof
         let proof =
             Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone()).unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
     }
 
     #[test]
@@ -980,7 +978,7 @@ mod test {
 
         // Generate and verify a proof
         let proof = Proof::prove_vartime(&witnesses[0], &statements[0], &mut transcripts[0].clone()).unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
     }
 
     #[test]
@@ -995,7 +993,7 @@ mod test {
         // Generate and verify a proof
         let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
             .unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
     }
 
     #[test]
@@ -1010,7 +1008,7 @@ mod test {
         // Generate and verify a proof
         let proof = Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
             .unwrap();
-        assert!(proof.verify(&statements[0], &mut transcripts[0]));
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
 
         // Serialize the proof
         let serialized = proof.to_bytes();
@@ -1034,13 +1032,13 @@ mod test {
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
             .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
             .collect::<Vec<Proof>>();
-        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts));
+        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts).is_ok());
     }
 
     #[test]
     fn test_prove_verify_empty_batch() {
-        // An empty batch is valid by definition
-        assert!(Proof::verify_batch(&[], &[], &mut []));
+        // An empty batch is invalid by definition
+        assert!(Proof::verify_batch(&[], &[], &mut []).is_err());
     }
 
     #[test]
@@ -1060,7 +1058,7 @@ mod test {
         let mut evil_transcript = Transcript::new("Evil transcript".as_bytes());
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&statements[0], &mut evil_transcript));
+        assert!(proof.verify(&statements[0], &mut evil_transcript).is_err());
     }
 
     #[test]
@@ -1085,7 +1083,7 @@ mod test {
             Statement::new(statements[0].get_params(), &evil_input_set, statements[0].get_J()).unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, &mut transcripts[0]));
+        assert!(proof.verify(&evil_statement, &mut transcripts[0]).is_err());
     }
 
     #[test]
@@ -1110,6 +1108,6 @@ mod test {
         .unwrap();
 
         // Attempt to verify the proof against the new statement, which should fail
-        assert!(!proof.verify(&evil_statement, &mut transcripts[0]));
+        assert!(proof.verify(&evil_statement, &mut transcripts[0]).is_err());
     }
 }

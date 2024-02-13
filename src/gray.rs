@@ -54,8 +54,9 @@ impl GrayIterator {
         // Get a base-`N` decomposition
         let mut base_N = Vec::with_capacity(M as usize);
         for _ in 0..M {
-            base_N.push(v % N);
-            v /= N;
+            // These are always defined since `N > 0`
+            base_N.push(v.checked_rem(N)?);
+            v = v.checked_div(N)?;
         }
 
         // Now get the Gray decomposition from the base-`N` decomposition
@@ -63,8 +64,8 @@ impl GrayIterator {
         let mut digits = vec![0; M as usize];
 
         for i in (0..M).rev() {
-            digits[i as usize] = (base_N[i as usize] + shift) % N;
-            shift = shift + N - digits[i as usize];
+            digits[i as usize] = (base_N[i as usize].checked_add(shift)?).checked_rem(N)?;
+            shift = shift.checked_add(N)?.checked_sub(digits[i as usize])?;
         }
 
         Some(digits)
@@ -128,7 +129,7 @@ impl Iterator for GrayIterator {
     #[allow(non_snake_case)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.i == 0 {
-            self.i += 1;
+            self.i = 1;
             return Some((0, 0, 0));
         }
 
@@ -150,7 +151,7 @@ impl Iterator for GrayIterator {
         let new = next[index];
 
         // Update the state
-        self.i += 1;
+        self.i = self.i.checked_add(1)?;
         self.last = next;
 
         Some((index, old, new))

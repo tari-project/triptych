@@ -64,6 +64,8 @@ impl Witness {
     pub fn random<R: CryptoRngCore>(params: &Arc<Parameters>, rng: &mut R) -> Self {
         // Generate a random index using wide reduction
         // This can't truncate since `N` is bounded by `u32`
+        // It is also defined since `N > 0`
+        #[allow(clippy::arithmetic_side_effects)]
         let l = (rng.as_rngcore().next_u64() % u64::from(params.get_N())) as u32;
 
         Self {
