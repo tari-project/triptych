@@ -610,11 +610,17 @@ impl Proof {
                 }
             }
 
-            // Generate weights for this proof's verification equations
-            let w1 = Scalar::random(&mut transcript_weights_rng);
-            let w2 = Scalar::random(&mut transcript_weights_rng);
-            let w3 = Scalar::random(&mut transcript_weights_rng);
-            let w4 = Scalar::random(&mut transcript_weights_rng);
+            // Generate nonzero weights for this proof's verification equations
+            let mut w1 = Scalar::ZERO;
+            let mut w2 = Scalar::ZERO;
+            let mut w3 = Scalar::ZERO;
+            let mut w4 = Scalar::ZERO;
+            while w1 == Scalar::ZERO || w2 == Scalar::ZERO || w3 == Scalar::ZERO || w4 == Scalar::ZERO {
+                w1 = Scalar::random(&mut transcript_weights_rng);
+                w2 = Scalar::random(&mut transcript_weights_rng);
+                w3 = Scalar::random(&mut transcript_weights_rng);
+                w4 = Scalar::random(&mut transcript_weights_rng);
+            }
 
             // Get the challenge for convenience
             let xi = xi_powers[1];
