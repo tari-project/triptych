@@ -63,14 +63,10 @@
 //! # extern crate alloc;
 //! use alloc::sync::Arc;
 //!
-//! # use triptych::parameters::Parameters;
 //! use curve25519_dalek::RistrettoPoint;
 //! use merlin::Transcript;
 //! use rand_core::OsRng;
-//! # use triptych::statement::InputSet;
-//! # use triptych::statement::Statement;
-//! # use triptych::witness::Witness;
-//! # use triptych::proof::Proof;
+//! use triptych::*;
 //!
 //! let mut rng = OsRng;
 //!
@@ -119,11 +115,15 @@ extern crate alloc;
 pub(crate) mod gray;
 /// Public parameters used for generating and verifying Triptych proofs.
 pub mod parameters;
+pub use parameters::Parameters;
 /// Triptych proofs.
 pub mod proof;
+pub use proof::Proof;
 /// Triptych proof statements.
 pub mod statement;
+pub use statement::{InputSet, Statement};
 /// Various utility functionality.
 pub(crate) mod util;
 /// Triptych proof witnesses.
 pub mod witness;
+pub use witness::Witness;
