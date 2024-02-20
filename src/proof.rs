@@ -22,12 +22,10 @@ use zeroize::Zeroizing;
 use crate::{
     gray::GrayIterator,
     statement::Statement,
-    util::{NullRng, OperationTiming},
+    transcript::ProofTranscript,
+    util::{delta, NullRng, OperationTiming},
     witness::Witness,
 };
-
-// Proof version flag
-const VERSION: u64 = 0;
 
 // Size of serialized proof elements in bytes
 const SERIALIZED_BYTES: usize = 32;
@@ -64,38 +62,6 @@ pub enum ProofError {
     /// Proof verification failed.
     #[snafu[display("Proof verification failed")]]
     FailedVerification,
-}
-
-/// Constant-time Kronecker delta function with scalar output.
-fn delta(x: u32, y: u32) -> Scalar {
-    let mut result = Scalar::ZERO;
-    result.conditional_assign(&Scalar::ONE, x.ct_eq(&y));
-    result
-}
-
-/// Get nonzero powers of a challenge value from a transcript.
-///
-/// If successful, returns powers of the challenge with exponents `[0, m]`.
-/// If any power is zero, returns an error.
-fn xi_powers(transcript: &mut Transcript, m: u32) -> Result<Vec<Scalar>, ProofError> {
-    // Get the verifier challenge using wide reduction
-    let mut xi_bytes = [0u8; 64];
-    transcript.challenge_bytes("xi".as_bytes(), &mut xi_bytes);
-    let xi = Scalar::from_bytes_mod_order_wide(&xi_bytes);
-
-    // Get powers of the challenge and confirm they are nonzero
-    let mut xi_powers = Vec::with_capacity((m as usize).checked_add(1).ok_or(ProofError::InvalidParameter)?);
-    let mut xi_power = Scalar::ONE;
-    for _ in 0..=m {
-        if xi_power == Scalar::ZERO {
-            return Err(ProofError::InvalidChallenge);
-        }
-
-        xi_powers.push(xi_power);
-        xi_power *= xi;
-    }
-
-    Ok(xi_powers)
 }
 
 impl Proof {
@@ -217,26 +183,15 @@ impl Proof {
             return Err(ProofError::InvalidParameter);
         }
 
-        // Continue the transcript with domain separation
-        transcript.append_message("dom-sep".as_bytes(), "Triptych proof".as_bytes());
-        transcript.append_u64("version".as_bytes(), VERSION);
-        transcript.append_message("params".as_bytes(), params.get_hash());
-        transcript.append_message("M".as_bytes(), statement.get_input_set().get_hash());
-        transcript.append_message("J".as_bytes(), J.compress().as_bytes());
-
-        // Construct a random number generator at the current transcript state
-        let mut transcript_rng = transcript
-            .build_rng()
-            .rekey_with_witness_bytes("l".as_bytes(), &l.to_le_bytes())
-            .rekey_with_witness_bytes("r".as_bytes(), r.as_bytes())
-            .finalize(rng);
+        // Set up the transcript
+        let mut transcript = ProofTranscript::new(transcript, statement, rng, Some(witness));
 
         // Compute the `A` matrix commitment
-        let r_A = Scalar::random(&mut transcript_rng);
+        let r_A = Scalar::random(transcript.as_mut_rng());
         let mut a = (0..params.get_m())
             .map(|_| {
                 (0..params.get_n())
-                    .map(|_| Scalar::random(&mut transcript_rng))
+                    .map(|_| Scalar::random(transcript.as_mut_rng()))
                     .collect::<Vec<Scalar>>()
             })
             .collect::<Vec<Vec<Scalar>>>();
@@ -248,7 +203,7 @@ impl Proof {
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `B` matrix commitment
-        let r_B = Scalar::random(&mut transcript_rng);
+        let r_B = Scalar::random(transcript.as_mut_rng());
         let l_decomposed = match timing {
             OperationTiming::Constant => {
                 GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
@@ -269,7 +224,7 @@ impl Proof {
 
         // Compute the `C` matrix commitment
         let two = Scalar::from(2u32);
-        let r_C = Scalar::random(&mut transcript_rng);
+        let r_C = Scalar::random(transcript.as_mut_rng());
         let a_sigma = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
@@ -282,7 +237,7 @@ impl Proof {
             .map_err(|_| ProofError::InvalidParameter)?;
 
         // Compute the `D` matrix commitment
-        let r_D = Scalar::random(&mut transcript_rng);
+        let r_D = Scalar::random(transcript.as_mut_rng());
         let a_square = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
@@ -297,7 +252,7 @@ impl Proof {
         // Random masks
         let rho = Zeroizing::new(
             (0..params.get_m())
-                .map(|_| Scalar::random(&mut transcript_rng))
+                .map(|_| Scalar::random(transcript.as_mut_rng()))
                 .collect::<Vec<Scalar>>(),
         );
 
@@ -365,20 +320,8 @@ impl Proof {
         // Compute `Y` vector
         let Y = rho.iter().map(|rho| rho * J).collect::<Vec<RistrettoPoint>>();
 
-        // Update the transcript
-        transcript.append_message("A".as_bytes(), A.compress().as_bytes());
-        transcript.append_message("B".as_bytes(), B.compress().as_bytes());
-        transcript.append_message("C".as_bytes(), C.compress().as_bytes());
-        transcript.append_message("D".as_bytes(), D.compress().as_bytes());
-        for item in &X {
-            transcript.append_message("X".as_bytes(), item.compress().as_bytes());
-        }
-        for item in &Y {
-            transcript.append_message("Y".as_bytes(), item.compress().as_bytes());
-        }
-
-        // Get challenge powers
-        let xi_powers = xi_powers(transcript, params.get_m())?;
+        // Run the Fiat-Shamir commitment phase to get the challenge powers
+        let xi_powers = transcript.commit(params, &A, &B, &C, &D, &X, &Y)?;
 
         // Compute the `f` matrix
         let f = (0..params.get_m())
@@ -543,47 +486,24 @@ impl Proof {
         // Set up a transcript generator for use in weighting
         let mut transcript_weights = Transcript::new("Triptych verifier weights".as_bytes());
 
+        let mut null_rng = NullRng;
+
         // Generate all verifier challenges
         let mut xi_powers_all = Vec::with_capacity(proofs.len());
         for (statement, proof, transcript) in izip!(statements.iter(), proofs.iter(), transcripts.iter_mut()) {
-            // Generate the verifier challenge
-            transcript.append_message("dom-sep".as_bytes(), "Triptych proof".as_bytes());
-            transcript.append_u64("version".as_bytes(), VERSION);
-            transcript.append_message("params".as_bytes(), params.get_hash());
-            transcript.append_message("M".as_bytes(), statement.get_input_set().get_hash());
-            transcript.append_message("J".as_bytes(), statement.get_J().compress().as_bytes());
+            // Set up the transcript
+            let mut transcript = ProofTranscript::new(transcript, statement, &mut null_rng, None);
 
-            transcript.append_message("A".as_bytes(), proof.A.compress().as_bytes());
-            transcript.append_message("B".as_bytes(), proof.B.compress().as_bytes());
-            transcript.append_message("C".as_bytes(), proof.C.compress().as_bytes());
-            transcript.append_message("D".as_bytes(), proof.D.compress().as_bytes());
-            for item in &proof.X {
-                transcript.append_message("X".as_bytes(), item.compress().as_bytes());
-            }
-            for item in &proof.Y {
-                transcript.append_message("Y".as_bytes(), item.compress().as_bytes());
-            }
+            // Run the Fiat-Shamir commitment phase to get the challenge powers
+            xi_powers_all.push(transcript.commit(params, &proof.A, &proof.B, &proof.C, &proof.D, &proof.X, &proof.Y)?);
 
-            // Get challenge powers
-            let xi_powers = xi_powers(transcript, params.get_m())?;
-            xi_powers_all.push(xi_powers);
-
-            // Finish the transcript for pseudorandom number generation
-            for f_row in &proof.f {
-                for f in f_row {
-                    transcript.append_message("f".as_bytes(), f.as_bytes());
-                }
-            }
-            transcript.append_message("z_A".as_bytes(), proof.z_A.as_bytes());
-            transcript.append_message("z_C".as_bytes(), proof.z_C.as_bytes());
-            transcript.append_message("z".as_bytes(), proof.z.as_bytes());
-            let mut transcript_rng = transcript.build_rng().finalize(&mut NullRng);
-
+            // Run the Fiat-Shamir response phase to get the transcript generator and weight
+            let mut transcript_rng = transcript.response(&proof.f, &proof.z_A, &proof.z_C, &proof.z);
             transcript_weights.append_u64("proof".as_bytes(), transcript_rng.as_rngcore().next_u64());
         }
 
         // Finalize the weighting transcript into a pseudorandom number generator
-        let mut transcript_weights_rng = transcript_weights.build_rng().finalize(&mut NullRng);
+        let mut transcript_weights_rng = transcript_weights.build_rng().finalize(&mut null_rng);
 
         // Process each proof
         for (proof, xi_powers) in proofs.iter().zip(xi_powers_all.iter()) {

@@ -1,11 +1,13 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
+use curve25519_dalek::Scalar;
 use rand_core::{
     impls::{next_u32_via_fill, next_u64_via_fill},
     CryptoRng,
     RngCore,
 };
+use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
 
 /// Options for constant- or variable-time operations.
@@ -15,6 +17,13 @@ pub(crate) enum OperationTiming {
     Constant,
     /// The operation may run in variable time
     Variable,
+}
+
+/// Constant-time Kronecker delta function with scalar output.
+pub(crate) fn delta(x: u32, y: u32) -> Scalar {
+    let mut result = Scalar::ZERO;
+    result.conditional_assign(&Scalar::ONE, x.ct_eq(&y));
+    result
 }
 
 /// A null random number generator that exists only for deterministic transcript-based weight generation.
