@@ -122,6 +122,8 @@ pub use proof::Proof;
 /// Triptych proof statements.
 pub mod statement;
 pub use statement::{InputSet, Statement};
+/// Triptych proof transcripts.
+pub(crate) mod transcript;
 /// Various utility functionality.
 pub(crate) mod util;
 /// Triptych proof witnesses.

@@ -41,6 +41,9 @@ pub enum ParameterError {
 }
 
 impl Parameters {
+    // Version identifier used for hashing
+    const VERSION: u64 = 0;
+
     /// Generate new [`Parameters`] for Triptych proofs.
     ///
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
@@ -110,6 +113,7 @@ impl Parameters {
         // Use `BLAKE3` for the transcript hash
         let mut hasher = Hasher::new();
         hasher.update("Triptych Parameters".as_bytes());
+        hasher.update(&Self::VERSION.to_le_bytes());
         hasher.update(&n.to_le_bytes());
         hasher.update(&m.to_le_bytes());
         hasher.update(G.compress().as_bytes());

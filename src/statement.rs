@@ -21,12 +21,16 @@ pub struct InputSet {
 }
 
 impl InputSet {
+    // Version identifier used for hashing
+    const VERSION: u64 = 0;
+
     /// Generate a new [`InputSet`] from a slice `M` of verification keys.
     #[allow(non_snake_case)]
     pub fn new(M: &[RistrettoPoint]) -> Self {
         // Use `BLAKE3` for the transcript hash
         let mut hasher = Hasher::new();
         hasher.update("Triptych InputSet".as_bytes());
+        hasher.update(&Self::VERSION.to_le_bytes());
         for item in M {
             hasher.update(item.compress().as_bytes());
         }
