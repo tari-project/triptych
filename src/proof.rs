@@ -59,9 +59,24 @@ pub enum ProofError {
     /// Proof deserialization failed.
     #[snafu(display("Proof deserialization failed"))]
     FailedDeserialization,
-    /// Proof verification failed.
-    #[snafu[display("Proof verification failed")]]
+    /// Single proof verification failed.
+    #[snafu[display("Single proof verification failed")]]
     FailedVerification,
+    /// Batch proof verification failed.
+    #[snafu[display("Batch proof verification failed")]]
+    FailedBatchVerification,
+    /// Batch proof verification failed.
+    #[snafu[display("Batch proof verification failed")]]
+    FailedBatchVerificationWithSingleBlame {
+        /// The index of a failed proof, or `None` if no such index was found due to an internal error.
+        index: Option<usize>,
+    },
+    /// Batch proof verification failed.
+    #[snafu[display("Batch proof verification failed")]]
+    FailedBatchVerificationWithFullBlame {
+        /// The indexes of all failed proofs.
+        indexes: Vec<usize>,
+    },
 }
 
 impl Proof {
@@ -369,14 +384,131 @@ impl Proof {
         )
     }
 
-    /// Verify a batch of Triptych [`Proofs`](`Proof`).
+    /// Verify a batch of Triptych [`Proofs`](`Proof`), identifying a single invalid proof if verification fails.
+    ///
+    /// An empty batch is valid by definition.
+    ///
+    /// If verification fails, this performs a subsequent number of verifications logarithmic in the size of the batch.
     ///
     /// Verification requires that the `statements` and `transcripts` match those used when the `proofs` were generated,
     /// and that they share a common [`InputSet`](`crate::statement::InputSet`) and
     /// [`Parameters`](`crate::parameters::Parameters`).
     ///
-    /// If any of the above requirements are not met, or if the batch is empty, or if any proof is invalid, returns a
-    /// [`ProofError`].
+    /// If any of the above requirements are not met, returns a [`ProofError`].
+    /// If any batch in the proof is invalid, returns a [`ProofError`] containing the index of an invalid proof.
+    /// It is not guaranteed that this index represents the _only_ invalid proof in the batch.
+    pub fn verify_batch_with_single_blame(
+        statements: &[Statement],
+        proofs: &[Proof],
+        transcripts: &mut [Transcript],
+    ) -> Result<(), ProofError> {
+        // Try to verify the full batch
+        if Self::verify_batch(statements, proofs, &mut transcripts.to_vec()).is_ok() {
+            return Ok(());
+        }
+
+        // The batch failed, so find an invalid proof using a binary search
+        let mut left = 0;
+        let mut right = proofs.len();
+
+        while left < right {
+            #[allow(clippy::arithmetic_side_effects)]
+            let average = left
+                .checked_add(
+                    // This cannot underflow since `left < right`
+                    (right - left) / 2,
+                )
+                .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?;
+
+            #[allow(clippy::arithmetic_side_effects)]
+            // This cannot underflow since `left < right`
+            let mid = if (right - left) % 2 == 0 {
+                average
+            } else {
+                average
+                    .checked_add(1)
+                    .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?
+            };
+
+            let failure_on_left = Self::verify_batch(
+                &statements[left..mid],
+                &proofs[left..mid],
+                &mut transcripts.to_vec()[left..mid],
+            )
+            .is_err();
+
+            if failure_on_left {
+                let left_check = mid
+                    .checked_sub(1)
+                    .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?;
+                if left == left_check {
+                    return Err(ProofError::FailedBatchVerificationWithSingleBlame { index: Some(left) });
+                }
+
+                right = mid;
+            } else {
+                let right_check = mid
+                    .checked_add(1)
+                    .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?;
+                if right == right_check {
+                    let right_result = right
+                        .checked_sub(1)
+                        .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?;
+                    return Err(ProofError::FailedBatchVerificationWithSingleBlame {
+                        index: Some(right_result),
+                    });
+                }
+
+                left = mid
+            }
+        }
+
+        // The batch failed, but we couldn't find a single failure! This should never happen.
+        Err(ProofError::FailedBatchVerificationWithSingleBlame { index: None })
+    }
+
+    /// Verify a batch of Triptych [`Proofs`](`Proof`), identifying all invalid proofs if verification fails.
+    ///
+    /// An empty batch is valid by definition.
+    ///
+    /// If verification fails, this performs a subsequent number of verifications linear in the size of the batch.
+    ///
+    /// Verification requires that the `statements` and `transcripts` match those used when the `proofs` were generated,
+    /// and that they share a common [`InputSet`](`crate::statement::InputSet`) and
+    /// [`Parameters`](`crate::parameters::Parameters`).
+    ///
+    /// If any of the above requirements are not met, returns a [`ProofError`].
+    /// If any batch in the proof is invalid, returns a [`ProofError`] containing the indexes of all invalid proofs.
+    pub fn verify_batch_with_full_blame(
+        statements: &[Statement],
+        proofs: &[Proof],
+        transcripts: &mut [Transcript],
+    ) -> Result<(), ProofError> {
+        // Try to verify the full batch
+        if Self::verify_batch(statements, proofs, &mut transcripts.to_vec()).is_ok() {
+            return Ok(());
+        }
+
+        // The batch failed, so check each proof and keep track of which are invalid
+        let mut failures = Vec::with_capacity(proofs.len());
+        for (index, (statement, proof, transcript)) in izip!(statements, proofs, transcripts.iter_mut()).enumerate() {
+            if proof.verify(statement, transcript).is_err() {
+                failures.push(index);
+            }
+        }
+
+        Err(ProofError::FailedBatchVerificationWithFullBlame { indexes: failures })
+    }
+
+    /// Verify a batch of Triptych [`Proofs`](`Proof`).
+    ///
+    /// An empty batch is valid by definition.
+    ///
+    /// Verification requires that the `statements` and `transcripts` match those used when the `proofs` were generated,
+    /// and that they share a common [`InputSet`](`crate::statement::InputSet`) and
+    /// [`Parameters`](`crate::parameters::Parameters`).
+    ///
+    /// If any of the above requirements are not met, or if any proof is invalid, returns a [`ProofError`].
     #[allow(clippy::too_many_lines, non_snake_case)]
     pub fn verify_batch(
         statements: &[Statement],
@@ -391,8 +523,11 @@ impl Proof {
             return Err(ProofError::InvalidParameter);
         }
 
-        // An empty batch is considered trivially invalid
-        let first_statement = statements.first().ok_or(ProofError::InvalidParameter)?;
+        // An empty batch is considered trivially valid
+        let first_statement = match statements.first() {
+            Some(statement) => statement,
+            None => return Ok(()),
+        };
 
         // Each statement must use the same input set (checked using the hash for efficiency)
         if !statements
@@ -799,7 +934,7 @@ mod test {
 
     use crate::{
         parameters::Parameters,
-        proof::Proof,
+        proof::{Proof, ProofError},
         statement::{InputSet, Statement},
         witness::Witness,
     };
@@ -948,17 +1083,110 @@ mod test {
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
         let (witnesses, statements, mut transcripts) = generate_data(n, m, batch, &mut rng);
 
-        // Generate the proofs and verify as a batch
+        // Generate the proofs
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
             .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
             .collect::<Vec<Proof>>();
-        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts).is_ok());
+
+        // Verify the batch with and without blame
+        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts.clone()).is_ok());
+        assert!(Proof::verify_batch_with_single_blame(&statements, &proofs, &mut transcripts.clone()).is_ok());
+        assert!(Proof::verify_batch_with_full_blame(&statements, &proofs, &mut transcripts).is_ok());
     }
 
     #[test]
     fn test_prove_verify_empty_batch() {
-        // An empty batch is invalid by definition
-        assert!(Proof::verify_batch(&[], &[], &mut []).is_err());
+        // An empty batch is valid by definition
+        assert!(Proof::verify_batch(&[], &[], &mut []).is_ok());
+        assert!(Proof::verify_batch_with_single_blame(&[], &[], &mut []).is_ok());
+        assert!(Proof::verify_batch_with_full_blame(&[], &[], &mut []).is_ok());
+    }
+
+    #[test]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_prove_verify_invalid_batch() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+        const batch: usize = 3; // batch size
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, batch, &mut rng);
+
+        // Generate the proofs
+        let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
+            .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+            .collect::<Vec<Proof>>();
+
+        // Manipulate a transcript so the corresponding proof is invalid
+        transcripts[0] = Transcript::new(b"Evil transcript");
+
+        // Verification should fail
+        assert!(Proof::verify_batch(&statements, &proofs, &mut transcripts).is_err());
+    }
+
+    #[test]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_prove_verify_invalid_batch_single_blame() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+
+        // Test against batches of even and odd size
+        for batch in [4, 5] {
+            let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+            let (witnesses, statements, transcripts) = generate_data(n, m, batch, &mut rng);
+
+            // Generate the proofs
+            let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
+                .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+                .collect::<Vec<Proof>>();
+
+            // Iteratively manipulate each transcript to make the corresponding proof invalid
+            for i in 0..proofs.len() {
+                let mut evil_transcripts = transcripts.clone();
+                evil_transcripts[i] = Transcript::new(b"Evil transcript");
+
+                // Verification should fail and blame the correct proof
+                let error =
+                    Proof::verify_batch_with_single_blame(&statements, &proofs, &mut evil_transcripts).unwrap_err();
+                if let ProofError::FailedBatchVerificationWithSingleBlame { index: Some(index) } = error {
+                    assert_eq!(index, i);
+                } else {
+                    panic!();
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_prove_verify_invalid_batch_full_blame() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+        const batch: usize = 4;
+        const failures: [usize; 2] = [1, 3];
+
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, batch, &mut rng);
+
+        // Generate the proofs
+        let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
+            .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+            .collect::<Vec<Proof>>();
+
+        // Manipulate some of the transcripts to make the corresponding proofs invalid
+        for i in failures {
+            transcripts[i] = Transcript::new(b"Evil transcript");
+        }
+
+        // Verification should fail and blame the correct proof
+        let error = Proof::verify_batch_with_full_blame(&statements, &proofs, &mut transcripts).unwrap_err();
+        if let ProofError::FailedBatchVerificationWithFullBlame { indexes } = error {
+            assert_eq!(indexes, failures);
+        } else {
+            panic!();
+        }
     }
 
     #[test]
