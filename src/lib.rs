@@ -97,7 +97,7 @@
 //! let statement = Statement::new(&params, &input_set, &J).unwrap();
 //!
 //! // Generate a transcript
-//! let mut transcript = Transcript::new("Test transcript".as_bytes());
+//! let mut transcript = Transcript::new(b"Test transcript");
 //!
 //! // Generate a proof from the witness
 //! let proof = Proof::prove(&witness, &statement, &mut transcript.clone()).unwrap();

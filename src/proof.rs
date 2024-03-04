@@ -484,7 +484,7 @@ impl Proof {
         let mut U_scalar = Scalar::ZERO;
 
         // Set up a transcript generator for use in weighting
-        let mut transcript_weights = Transcript::new("Triptych verifier weights".as_bytes());
+        let mut transcript_weights = Transcript::new(b"Triptych verifier weights");
 
         let mut null_rng = NullRng;
 
@@ -499,7 +499,7 @@ impl Proof {
 
             // Run the Fiat-Shamir response phase to get the transcript generator and weight
             let mut transcript_rng = transcript.response(&proof.f, &proof.z_A, &proof.z_C, &proof.z);
-            transcript_weights.append_u64("proof".as_bytes(), transcript_rng.as_rngcore().next_u64());
+            transcript_weights.append_u64(b"proof", transcript_rng.as_rngcore().next_u64());
         }
 
         // Finalize the weighting transcript into a pseudorandom number generator
@@ -846,8 +846,8 @@ mod test {
         // Generate transcripts
         let transcripts = (0..b)
             .map(|i| {
-                let mut transcript = Transcript::new("Test transcript".as_bytes());
-                transcript.append_u64("index".as_bytes(), i as u64);
+                let mut transcript = Transcript::new(b"Test transcript");
+                transcript.append_u64(b"index", i as u64);
 
                 transcript
             })
@@ -975,7 +975,7 @@ mod test {
             Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0]).unwrap();
 
         // Generate a modified transcript
-        let mut evil_transcript = Transcript::new("Evil transcript".as_bytes());
+        let mut evil_transcript = Transcript::new(b"Evil transcript");
 
         // Attempt to verify the proof against the new statement, which should fail
         assert!(proof.verify(&statements[0], &mut evil_transcript).is_err());

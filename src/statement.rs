@@ -29,7 +29,7 @@ impl InputSet {
     pub fn new(M: &[RistrettoPoint]) -> Self {
         // Use `BLAKE3` for the transcript hash
         let mut hasher = Hasher::new();
-        hasher.update("Triptych InputSet".as_bytes());
+        hasher.update(b"Triptych InputSet");
         hasher.update(&Self::VERSION.to_le_bytes());
         for item in M {
             hasher.update(item.compress().as_bytes());
