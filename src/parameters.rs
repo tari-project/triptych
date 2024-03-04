@@ -59,7 +59,7 @@ impl Parameters {
         // Use `BLAKE3` to generate `U`
         let mut U_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update("Triptych U".as_bytes());
+        hasher.update(b"Triptych U");
         hasher.finalize_xof().fill(&mut U_bytes);
         let U = RistrettoPoint::from_uniform_bytes(&U_bytes);
 
@@ -92,13 +92,13 @@ impl Parameters {
         // Use `BLAKE3` to generate `CommitmentH`
         let mut CommitmentH_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update("Triptych CommitmentH".as_bytes());
+        hasher.update(b"Triptych CommitmentH");
         hasher.finalize_xof().fill(&mut CommitmentH_bytes);
         let CommitmentH = RistrettoPoint::from_uniform_bytes(&CommitmentH_bytes);
 
         // Use `BLAKE3` for the commitment matrix generators
         let mut hasher = Hasher::new();
-        hasher.update("Triptych CommitmentG".as_bytes());
+        hasher.update(b"Triptych CommitmentG");
         hasher.update(&n.to_le_bytes());
         hasher.update(&m.to_le_bytes());
         let mut hasher_xof = hasher.finalize_xof();
@@ -112,7 +112,7 @@ impl Parameters {
 
         // Use `BLAKE3` for the transcript hash
         let mut hasher = Hasher::new();
-        hasher.update("Triptych Parameters".as_bytes());
+        hasher.update(b"Triptych Parameters");
         hasher.update(&Self::VERSION.to_le_bytes());
         hasher.update(&n.to_le_bytes());
         hasher.update(&m.to_le_bytes());

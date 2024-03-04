@@ -80,7 +80,7 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
 
         // Get the initial challenge using wide reduction
         let mut xi_bytes = [0u8; 64];
-        self.transcript.challenge_bytes("xi".as_bytes(), &mut xi_bytes);
+        self.transcript.challenge_bytes(b"xi", &mut xi_bytes);
         let xi = Scalar::from_bytes_mod_order_wide(&xi_bytes);
 
         // Get powers of the challenge and confirm they are nonzero

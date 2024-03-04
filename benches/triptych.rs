@@ -65,8 +65,8 @@ fn generate_data<R: CryptoRngCore>(
     // Generate transcripts
     let transcripts = (0..b)
         .map(|i| {
-            let mut transcript = Transcript::new("Test transcript".as_bytes());
-            transcript.append_u64("index".as_bytes(), i as u64);
+            let mut transcript = Transcript::new(b"Test transcript");
+            transcript.append_u64(b"index", i as u64);
 
             transcript
         })
