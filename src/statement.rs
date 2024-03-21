@@ -4,7 +4,12 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use blake3::Hasher;
-use curve25519_dalek::{traits::Identity, RistrettoPoint};
+use curve25519_dalek::{
+    ristretto::VartimeRistrettoPrecomputation,
+    traits::{Identity, VartimePrecomputedMultiscalarMul},
+    RistrettoPoint,
+};
+use derivative::Derivative;
 use snafu::prelude::*;
 
 use crate::parameters::Parameters;
@@ -14,10 +19,23 @@ use crate::parameters::Parameters;
 /// An input set is constructed from a vector of verification keys.
 /// Internally, it also contains cryptographic hash data to make proofs more efficient.
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct InputSet {
+    #[derivative(Debug = "ignore")]
     M: Vec<RistrettoPoint>,
+    #[derivative(Debug = "ignore")]
+    precomputation: Arc<VartimeRistrettoPrecomputation>,
     hash: Vec<u8>,
+}
+
+impl Eq for InputSet {}
+
+impl PartialEq for InputSet {
+    fn eq(&self, other: &Self) -> bool {
+        // This only checks hashes for efficiency, which is fine given the constructor
+        self.hash == other.hash
+    }
 }
 
 impl InputSet {
@@ -37,6 +55,7 @@ impl InputSet {
 
         Self {
             M: M.to_vec(),
+            precomputation: Arc::new(VartimeRistrettoPrecomputation::new(M)),
             hash: hasher.finalize().as_bytes().to_vec(),
         }
     }
@@ -66,6 +85,11 @@ impl InputSet {
     /// Get the verification keys for this [`InputSet`].
     pub fn get_keys(&self) -> &[RistrettoPoint] {
         &self.M
+    }
+
+    /// Get the precomputation for this [`InputSet`].
+    pub(crate) fn get_precomputation(&self) -> &VartimeRistrettoPrecomputation {
+        &self.precomputation
     }
 
     /// Get a cryptographic hash representation of this [`InputSet`], suitable for transcripting.
