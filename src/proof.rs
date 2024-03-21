@@ -6,7 +6,7 @@ use core::{iter::once, slice, slice::ChunksExact};
 
 use curve25519_dalek::{
     ristretto::CompressedRistretto,
-    traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
+    traits::{Identity, MultiscalarMul, VartimePrecomputedMultiscalarMul},
     RistrettoPoint,
     Scalar,
 };
@@ -178,6 +178,7 @@ impl TriptychProof {
         let r = witness.get_r();
         let l = witness.get_l();
         let M = statement.get_input_set().get_keys();
+        let precomputation = statement.get_input_set().get_precomputation();
         let params = statement.get_params();
         let J = statement.get_J();
 
@@ -331,7 +332,11 @@ impl TriptychProof {
 
                 match timing {
                     OperationTiming::Constant => RistrettoPoint::multiscalar_mul(X_scalars, X_points),
-                    OperationTiming::Variable => RistrettoPoint::vartime_multiscalar_mul(X_scalars, X_points),
+                    OperationTiming::Variable => precomputation.vartime_mixed_multiscalar_mul(
+                        X_scalars.take(M.len()),
+                        once(rho),
+                        once(params.get_G()),
+                    ),
                 }
             })
             .collect::<Vec<RistrettoPoint>>();
@@ -547,6 +552,7 @@ impl TriptychProof {
 
         // Extract common values for convenience
         let M = first_statement.get_input_set().get_keys();
+        let precomputation = first_statement.get_input_set().get_precomputation();
         let params = first_statement.get_params();
 
         // Check that all proof semantics are valid for the statement
@@ -602,7 +608,6 @@ impl TriptychProof {
             .chain(once(params.get_G()))
             .chain(params.get_CommitmentG().iter())
             .chain(once(params.get_CommitmentH()))
-            .chain(M.iter())
             .chain(once(params.get_U()))
             .collect::<Vec<&RistrettoPoint>>();
 
@@ -741,11 +746,10 @@ impl TriptychProof {
         scalars.push(G_scalar);
         scalars.extend(CommitmentG_scalars);
         scalars.push(CommitmentH_scalar);
-        scalars.extend(M_scalars);
         scalars.push(U_scalar);
 
         // Perform the final check; this can be done in variable time since it holds no secrets
-        if RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points) == RistrettoPoint::identity() {
+        if precomputation.vartime_mixed_multiscalar_mul(M_scalars, scalars, points) == RistrettoPoint::identity() {
             Ok(())
         } else {
             Err(ProofError::FailedVerification)

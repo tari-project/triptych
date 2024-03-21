@@ -12,6 +12,7 @@ categories = ["cryptography"]
 blake3 = { version = "1.5.1", default-features = false }
 crypto-bigint = { version = "0.5.5", default-features = false }
 curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "digest", "rand_core", "zeroize"] }
+derivative = { version = "2.2.0", default-features = false, features = ["use_core"] }
 itertools = { version = "0.12.1", default-features = false }
 merlin = { version = "3.0.0", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }

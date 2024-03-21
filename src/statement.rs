@@ -3,7 +3,12 @@
 
 use alloc::{sync::Arc, vec, vec::Vec};
 
-use curve25519_dalek::{traits::Identity, RistrettoPoint};
+use curve25519_dalek::{
+    ristretto::VartimeRistrettoPrecomputation,
+    traits::{Identity, VartimePrecomputedMultiscalarMul},
+    RistrettoPoint,
+};
+use derivative::Derivative;
 use snafu::prelude::*;
 
 use crate::{Transcript, TriptychParameters, TRANSCRIPT_HASH_BYTES};
@@ -13,10 +18,23 @@ use crate::{Transcript, TriptychParameters, TRANSCRIPT_HASH_BYTES};
 /// An input set is constructed from a vector of verification keys.
 /// Internally, it also contains cryptographic hash data to make proofs more efficient.
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct TriptychInputSet {
+    #[derivative(Debug = "ignore")]
     M: Vec<RistrettoPoint>,
+    #[derivative(Debug = "ignore")]
+    precomputation: Arc<VartimeRistrettoPrecomputation>,
     hash: Vec<u8>,
+}
+
+impl Eq for TriptychInputSet {}
+
+impl PartialEq for TriptychInputSet {
+    fn eq(&self, other: &Self) -> bool {
+        // This only checks hashes for efficiency, which is fine given the constructor
+        self.hash == other.hash
+    }
 }
 
 impl TriptychInputSet {
@@ -74,12 +92,21 @@ impl TriptychInputSet {
         let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
         transcript.challenge_bytes(b"hash", &mut hash);
 
-        Ok(Self { M: M.to_vec(), hash })
+        Ok(Self {
+            M: M.to_vec(),
+            precomputation: Arc::new(VartimeRistrettoPrecomputation::new(M)),
+            hash,
+        })
     }
 
     /// Get the verification keys for this [`TriptychInputSet`].
     pub fn get_keys(&self) -> &[RistrettoPoint] {
         &self.M
+    }
+
+    /// Get the precomputation for this [`TriptychInputSet`].
+    pub(crate) fn get_precomputation(&self) -> &VartimeRistrettoPrecomputation {
+        &self.precomputation
     }
 
     /// Get a cryptographic hash representation of this [`TriptychInputSet`], suitable for transcripting.
