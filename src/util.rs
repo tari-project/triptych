@@ -19,11 +19,22 @@ pub(crate) enum OperationTiming {
     Variable,
 }
 
-/// Constant-time Kronecker delta function with scalar output.
-pub(crate) fn delta(x: u32, y: u32) -> Scalar {
-    let mut result = Scalar::ZERO;
-    result.conditional_assign(&Scalar::ONE, x.ct_eq(&y));
-    result
+/// Kronecker delta function with scalar output, possibly in constant time.
+pub(crate) fn delta(x: u32, y: u32, timing: OperationTiming) -> Scalar {
+    match timing {
+        OperationTiming::Constant => {
+            let mut result = Scalar::ZERO;
+            result.conditional_assign(&Scalar::ONE, x.ct_eq(&y));
+            result
+        },
+        OperationTiming::Variable => {
+            if x == y {
+                Scalar::ONE
+            } else {
+                Scalar::ZERO
+            }
+        },
+    }
 }
 
 /// A null random number generator that exists only for deterministic transcript-based weight generation.
@@ -57,9 +68,26 @@ impl CryptoRng for NullRng {}
 
 #[cfg(test)]
 mod test {
+    use curve25519_dalek::Scalar;
     use rand_core::RngCore;
 
-    use super::NullRng;
+    use super::{NullRng, OperationTiming};
+    use crate::util::delta;
+
+    #[test]
+    fn test_delta() {
+        for timing in [OperationTiming::Constant, OperationTiming::Variable] {
+            // Equal values
+            assert_eq!(delta(0, 0, timing), Scalar::ONE);
+            assert_eq!(delta(1, 1, timing), Scalar::ONE);
+            assert_eq!(delta(u32::MAX, u32::MAX, timing), Scalar::ONE);
+
+            // Unequal values
+            assert_eq!(delta(0, 1, timing), Scalar::ZERO);
+            assert_eq!(delta(1, 0, timing), Scalar::ZERO);
+            assert_eq!(delta(u32::MAX, 0, timing), Scalar::ZERO);
+        }
+    }
 
     #[test]
     fn test_null_rng() {
