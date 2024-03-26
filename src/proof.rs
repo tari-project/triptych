@@ -229,7 +229,7 @@ impl Proof {
         let sigma = (0..params.get_m())
             .map(|j| {
                 (0..params.get_n())
-                    .map(|i| delta(l_decomposed[j as usize], i))
+                    .map(|i| delta(l_decomposed[j as usize], i, timing))
                     .collect::<Vec<Scalar>>()
             })
             .collect::<Vec<Vec<Scalar>>>();
