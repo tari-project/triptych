@@ -926,7 +926,7 @@ impl Proof {
 mod test {
     use alloc::{sync::Arc, vec::Vec};
 
-    use curve25519_dalek::{RistrettoPoint, Scalar};
+    use curve25519_dalek::{traits::Identity, RistrettoPoint, Scalar};
     use itertools::izip;
     use merlin::Transcript;
     use rand_chacha::ChaCha12Rng;
@@ -934,10 +934,20 @@ mod test {
 
     use crate::{
         parameters::Parameters,
-        proof::{Proof, ProofError},
+        proof::{Proof, ProofError, SERIALIZED_BYTES},
         statement::{InputSet, Statement},
         witness::Witness,
     };
+
+    // Check that the serialized proof element size constant is correct
+    #[test]
+    fn test_serialized_bytes() {
+        // Check the scalar encoding size
+        assert_eq!(Scalar::ZERO.as_bytes().len(), SERIALIZED_BYTES);
+
+        // Check the group element encoding size
+        assert_eq!(RistrettoPoint::identity().compress().as_bytes().len(), SERIALIZED_BYTES);
+    }
 
     // Generate a batch of witnesses, statements, and transcripts
     #[allow(non_snake_case)]
