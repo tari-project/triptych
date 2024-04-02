@@ -10,7 +10,7 @@ use curve25519_dalek::{
     RistrettoPoint,
     Scalar,
 };
-use itertools::izip;
+use itertools::{izip, Itertools};
 use merlin::Transcript;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
@@ -530,20 +530,12 @@ impl Proof {
         };
 
         // Each statement must use the same input set (checked using the hash for efficiency)
-        if !statements
-            .iter()
-            .map(|s| s.get_input_set().get_hash())
-            .all(|h| h == first_statement.get_input_set().get_hash())
-        {
+        if !statements.iter().map(|s| s.get_input_set().get_hash()).all_equal() {
             return Err(ProofError::InvalidParameter);
         }
 
         // Each statement must use the same parameters (checked using the hash for efficiency)
-        if !statements
-            .iter()
-            .map(|s| s.get_params().get_hash())
-            .all(|h| h == first_statement.get_params().get_hash())
-        {
+        if !statements.iter().map(|s| s.get_params().get_hash()).all_equal() {
             return Err(ProofError::InvalidParameter);
         }
 
