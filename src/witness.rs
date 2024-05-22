@@ -8,7 +8,7 @@ use rand_core::CryptoRngCore;
 use snafu::prelude::*;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use crate::parameters::Parameters;
+use crate::Parameters;
 
 /// A Triptych proof witness.
 ///

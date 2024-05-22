@@ -12,7 +12,6 @@ use alloc::sync::Arc;
 use criterion::{BatchSize, Criterion};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use itertools::izip;
-use merlin::Transcript;
 use rand_chacha::ChaCha12Rng;
 use rand_core::{CryptoRngCore, SeedableRng};
 use triptych::{
@@ -20,6 +19,7 @@ use triptych::{
     proof::Proof,
     statement::{InputSet, Statement},
     witness::Witness,
+    Transcript,
 };
 
 // Parameters

@@ -7,7 +7,7 @@ use blake3::Hasher;
 use curve25519_dalek::{traits::Identity, RistrettoPoint};
 use snafu::prelude::*;
 
-use crate::parameters::Parameters;
+use crate::Parameters;
 
 /// A Triptych input set.
 ///
@@ -150,7 +150,7 @@ mod test {
     use rand_chacha::ChaCha12Rng;
     use rand_core::SeedableRng;
 
-    use crate::{parameters::Parameters, statement::InputSet};
+    use crate::{InputSet, Parameters};
 
     // Helper function to generate random vectors
     fn random_vector(size: usize) -> Vec<RistrettoPoint> {

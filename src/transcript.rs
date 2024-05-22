@@ -4,10 +4,10 @@
 use alloc::vec::Vec;
 
 use curve25519_dalek::{RistrettoPoint, Scalar};
-use merlin::{Transcript, TranscriptRng};
+use merlin::TranscriptRng;
 use rand_core::CryptoRngCore;
 
-use crate::{proof::ProofError, Parameters, Statement, Witness};
+use crate::{proof::ProofError, Parameters, Statement, Transcript, Witness};
 
 // Version identifier
 const VERSION: u64 = 0;
