@@ -11,7 +11,6 @@ use curve25519_dalek::{
     Scalar,
 };
 use itertools::{izip, Itertools};
-use merlin::Transcript;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -21,10 +20,11 @@ use zeroize::Zeroizing;
 
 use crate::{
     gray::GrayIterator,
-    statement::Statement,
     transcript::ProofTranscript,
     util::{delta, NullRng, OperationTiming},
-    witness::Witness,
+    Statement,
+    Transcript,
+    Witness,
 };
 
 // Size of serialized proof elements in bytes
@@ -920,15 +920,17 @@ mod test {
 
     use curve25519_dalek::{traits::Identity, RistrettoPoint, Scalar};
     use itertools::izip;
-    use merlin::Transcript;
     use rand_chacha::ChaCha12Rng;
     use rand_core::{CryptoRngCore, SeedableRng};
 
     use crate::{
-        parameters::Parameters,
-        proof::{Proof, ProofError, SERIALIZED_BYTES},
-        statement::{InputSet, Statement},
-        witness::Witness,
+        proof::{ProofError, SERIALIZED_BYTES},
+        InputSet,
+        Parameters,
+        Proof,
+        Statement,
+        Transcript,
+        Witness,
     };
 
     // Check that the serialized proof element size constant is correct

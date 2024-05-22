@@ -64,7 +64,6 @@
 //! use alloc::sync::Arc;
 //!
 //! use curve25519_dalek::RistrettoPoint;
-//! use merlin::Transcript;
 //! use rand_core::OsRng;
 //! use triptych::*;
 //!
@@ -110,6 +109,8 @@
 #![no_std]
 
 extern crate alloc;
+
+pub use merlin::Transcript;
 
 /// Iterated arbitrary-base Gray code functionaity.
 pub(crate) mod gray;
