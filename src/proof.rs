@@ -7,8 +7,7 @@ use core::{iter::once, slice, slice::ChunksExact};
 use curve25519_dalek::{
     ristretto::CompressedRistretto,
     traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
-    RistrettoPoint,
-    Scalar,
+    RistrettoPoint, Scalar,
 };
 use itertools::{izip, Itertools};
 use rand_core::CryptoRngCore;
@@ -22,9 +21,7 @@ use crate::{
     gray::GrayIterator,
     transcript::ProofTranscript,
     util::{delta, NullRng, OperationTiming},
-    Statement,
-    Transcript,
-    Witness,
+    Statement, Transcript, Witness,
 };
 
 // Size of serialized proof elements in bytes
@@ -51,8 +48,8 @@ pub struct Proof {
 #[derive(Debug, Snafu)]
 pub enum ProofError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter { reason: &'static str },
     /// A transcript challenge was invalid.
     #[snafu(display("A transcript challenge was invalid"))]
     InvalidChallenge,
@@ -167,7 +164,9 @@ impl Proof {
     ) -> Result<Self, ProofError> {
         // Check that the witness and statement have identical parameters
         if witness.get_params() != statement.get_params() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "Witness and statement parameters do not match",
+            });
         }
 
         // Extract values for convenience
@@ -192,10 +191,10 @@ impl Proof {
         }
 
         if M_l != r * params.get_G() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter { reason: "M_l != r * G" });
         }
         if &(r * J) != params.get_U() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter { reason: "r * J != U" });
         }
 
         // Set up the transcript
@@ -215,16 +214,23 @@ impl Proof {
         }
         let A = params
             .commit_matrix(&a, &r_A, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "params commit_matrix failed",
+            })?;
 
         // Compute the `B` matrix commitment
         let r_B = Scalar::random(transcript.as_mut_rng());
         let l_decomposed = match timing {
             OperationTiming::Constant => {
-                GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+                GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter {
+                    reason: "GrayIterator decompose failed",
+                })?
             },
-            OperationTiming::Variable => GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l)
-                .ok_or(ProofError::InvalidParameter)?,
+            OperationTiming::Variable => GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l).ok_or(
+                ProofError::InvalidParameter {
+                    reason: "GrayIterator decompose vartime failed",
+                },
+            )?,
         };
         let sigma = (0..params.get_m())
             .map(|j| {
@@ -235,7 +241,9 @@ impl Proof {
             .collect::<Vec<Vec<Scalar>>>();
         let B = params
             .commit_matrix(&sigma, &r_B, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "constructing B failed",
+            })?;
 
         // Compute the `C` matrix commitment
         let two = Scalar::from(2u32);
@@ -249,7 +257,9 @@ impl Proof {
             .collect::<Vec<Vec<Scalar>>>();
         let C = params
             .commit_matrix(&a_sigma, &r_C, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "Constructing C failed",
+            })?;
 
         // Compute the `D` matrix commitment
         let r_D = Scalar::random(transcript.as_mut_rng());
@@ -262,7 +272,9 @@ impl Proof {
             .collect::<Vec<Vec<Scalar>>>();
         let D = params
             .commit_matrix(&a_square, &r_D, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "Constructing D failed",
+            })?;
 
         // Random masks
         let rho = Zeroizing::new(
@@ -275,7 +287,9 @@ impl Proof {
         let mut p = Vec::<Vec<Scalar>>::with_capacity(params.get_N() as usize);
         let mut k_decomposed = vec![0; params.get_m() as usize];
         for (gray_index, _, gray_new) in
-            GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?
+            GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter {
+                reason: "computing P polynomial gray index failed",
+            })?
         {
             k_decomposed[gray_index] = gray_new;
 
@@ -284,7 +298,9 @@ impl Proof {
             coefficients.resize(
                 (params.get_m() as usize)
                     .checked_add(1)
-                    .ok_or(ProofError::InvalidParameter)?,
+                    .ok_or(ProofError::InvalidParameter {
+                        reason: "coefficients resize failed",
+                    })?,
                 Scalar::ZERO,
             );
             coefficients[0] = a[0][k_decomposed[0] as usize];
@@ -350,8 +366,9 @@ impl Proof {
         // Compute the remaining response values
         let z_A = r_A + xi_powers[1] * r_B;
         let z_C = xi_powers[1] * r_C + r_D;
-        let z = r * xi_powers[params.get_m() as usize] -
-            rho.iter()
+        let z = r * xi_powers[params.get_m() as usize]
+            - rho
+                .iter()
                 .zip(xi_powers.iter())
                 .map(|(rho, xi_power)| rho * xi_power)
                 .sum::<Scalar>();
@@ -517,10 +534,14 @@ impl Proof {
     ) -> Result<(), ProofError> {
         // Check that we have the same number of statements, proofs, and transcripts
         if statements.len() != proofs.len() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "statements and proofs have different lengths",
+            });
         }
         if statements.len() != transcripts.len() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "statements and transcripts have different lengths",
+            });
         }
 
         // An empty batch is considered trivially valid
@@ -531,12 +552,16 @@ impl Proof {
 
         // Each statement must use the same input set (checked using the hash for efficiency)
         if !statements.iter().map(|s| s.get_input_set().get_hash()).all_equal() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "Input set hash mismatch",
+            });
         }
 
         // Each statement must use the same parameters (checked using the hash for efficiency)
         if !statements.iter().map(|s| s.get_params().get_hash()).all_equal() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "Parameter hash mismatch",
+            });
         }
 
         // Extract common values for convenience
@@ -546,23 +571,37 @@ impl Proof {
         // Check that all proof semantics are valid for the statement
         for proof in proofs {
             if proof.X.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "X length mismatch",
+                });
             }
             if proof.Y.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "Y length mismatch",
+                });
             }
             if proof.f.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "f length mismatch",
+                });
             }
             for f_row in &proof.f {
-                if f_row.len() != params.get_n().checked_sub(1).ok_or(ProofError::InvalidParameter)? as usize {
-                    return Err(ProofError::InvalidParameter);
+                if f_row.len()
+                    != params.get_n().checked_sub(1).ok_or(ProofError::InvalidParameter {
+                        reason: "n must be greater than 1",
+                    })? as usize
+                {
+                    return Err(ProofError::InvalidParameter {
+                        reason: "f row length mismatch",
+                    });
                 }
             }
         }
 
         // Determine the size of the final check vector, which must not overflow `usize`
-        let batch_size = u32::try_from(proofs.len()).map_err(|_| ProofError::InvalidParameter)?;
+        let batch_size = u32::try_from(proofs.len()).map_err(|_| ProofError::InvalidParameter {
+            reason: "proofs len greater than u32 max",
+        })?;
 
         // This is unlikely to overflow; even if it does, the only effect is unnecessary reallocation
         #[allow(clippy::arithmetic_side_effects)]
@@ -578,7 +617,9 @@ impl Proof {
                 + 2 * params.get_m() // X, Y
             ),
         )
-        .map_err(|_| ProofError::InvalidParameter)?;
+        .map_err(|_| ProofError::InvalidParameter {
+            reason: "final_size larger than u32 max",
+        })?;
 
         // Set up the point vector for the final check
         let points = proofs
@@ -647,7 +688,9 @@ impl Proof {
             // Check that `f` does not contain zero, which breaks batch inversion
             for f_row in &f {
                 if f_row.contains(&Scalar::ZERO) {
-                    return Err(ProofError::InvalidParameter);
+                    return Err(ProofError::InvalidParameter {
+                        reason: "f contains zero",
+                    });
                 }
             }
 
@@ -708,7 +751,9 @@ impl Proof {
             // Set up the initial `f` product and Gray iterator
             let mut f_product = f.iter().map(|f_row| f_row[0]).product::<Scalar>();
             let gray_iterator =
-                GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?;
+                GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter {
+                    reason: "Could not construct gray iterator",
+                })?;
 
             // Invert each element of `f` for efficiency
             let mut f_inverse_flat = f.iter().flatten().copied().collect::<Vec<Scalar>>();
@@ -925,12 +970,7 @@ mod test {
 
     use crate::{
         proof::{ProofError, SERIALIZED_BYTES},
-        InputSet,
-        Parameters,
-        Proof,
-        Statement,
-        Transcript,
-        Witness,
+        InputSet, Parameters, Proof, Statement, Transcript, Witness,
     };
 
     // Check that the serialized proof element size constant is correct
