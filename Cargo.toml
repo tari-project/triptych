@@ -6,29 +6,48 @@ edition = "2021"
 description = "An experimental Rust implementation of the Triptych zero-knowledge proving system"
 readme = "README.md"
 license = "BSD-3-Clause"
+repository = "https://github.com/tari-project/triptych"
 categories = ["cryptography"]
 
 [dependencies]
 blake3 = { version = "1.5.1", default-features = false }
 crypto-bigint = { version = "0.5.5", default-features = false }
-curve25519-dalek = { version = "4.1.2", default-features = false, features = ["alloc", "digest", "rand_core", "zeroize"] }
+curve25519-dalek = { version = "4.1.2", default-features = false, features = [
+    "alloc",
+    "digest",
+    "rand_core",
+    "zeroize",
+] }
 itertools = { version = "0.12.1", default-features = false }
 merlin = { version = "3.0.0", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
-serde = { version = "1.0.198", optional = true, default-features = false, features = ["derive"] }
+serde = { version = "1.0.198", optional = true, default-features = false, features = [
+    "derive",
+] }
 snafu = { version = "0.8.2", default-features = false }
 subtle = { version = "2.5.0", default-features = false }
 zeroize = { version = "1.7.0", default-features = false }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", default-features = false, features = ["cargo_bench_support"] }
+criterion = { version = "0.5.1", default-features = false, features = [
+    "cargo_bench_support",
+] }
 rand_chacha = { version = "0.3.1", default-features = false }
 
 [features]
 default = ["rand", "serde", "std"]
 rand = ["rand_core/getrandom"]
 serde = ["dep:serde", "curve25519-dalek/serde", "zeroize/serde"]
-std = ["blake3/std", "itertools/use_std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "subtle/std", "zeroize/std"]
+std = [
+    "blake3/std",
+    "itertools/use_std",
+    "merlin/std",
+    "rand_core/std",
+    "serde?/std",
+    "snafu/std",
+    "subtle/std",
+    "zeroize/std",
+]
 
 [[bench]]
 name = "triptych"
