@@ -73,10 +73,10 @@
 //! // This is `Arc`-wrapped to facilitate efficient reuse!
 //! const n: u32 = 2;
 //! const m: u32 = 3;
-//! let params = Arc::new(Parameters::new(n, m).unwrap());
+//! let params = Arc::new(TriptychParameters::new(n, m).unwrap());
 //!
 //! // Generate a random witness, which includes the signing key and an index where it will appear
-//! let witness = Witness::random(&params, &mut rng);
+//! let witness = TriptychWitness::random(&params, &mut rng);
 //!
 //! // Generate an input set of random verification keys, placing ours at the chosen index
 //! // This is `Arc`-wrapped to facilitate efficient reuse!
@@ -89,17 +89,17 @@
 //!         }
 //!     })
 //!     .collect::<Vec<RistrettoPoint>>();
-//! let input_set = Arc::new(InputSet::new(&M));
+//! let input_set = Arc::new(TriptychInputSet::new(&M));
 //!
 //! // Generate the statement, which includes the verification key vector and linking tag
 //! let J = witness.compute_linking_tag();
-//! let statement = Statement::new(&params, &input_set, &J).unwrap();
+//! let statement = TriptychStatement::new(&params, &input_set, &J).unwrap();
 //!
 //! // Generate a transcript
 //! let mut transcript = Transcript::new(b"Test transcript");
 //!
 //! // Generate a proof from the witness
-//! let proof = Proof::prove(&witness, &statement, &mut transcript.clone()).unwrap();
+//! let proof = TriptychProof::prove(&witness, &statement, &mut transcript.clone()).unwrap();
 //!
 //! // The proof should verify against the same statement and transcript
 //! assert!(proof.verify(&statement, &mut transcript).is_ok());
@@ -116,17 +116,17 @@ pub use merlin::Transcript;
 pub(crate) mod gray;
 /// Public parameters used for generating and verifying Triptych proofs.
 pub mod parameters;
-pub use parameters::Parameters;
+pub use parameters::TriptychParameters;
 /// Triptych proofs.
 pub mod proof;
-pub use proof::Proof;
+pub use proof::TriptychProof;
 /// Triptych proof statements.
 pub mod statement;
-pub use statement::{InputSet, Statement};
+pub use statement::{TriptychInputSet, TriptychStatement};
 /// Triptych proof transcripts.
 pub(crate) mod transcript;
 /// Various utility functionality.
 pub(crate) mod util;
 /// Triptych proof witnesses.
 pub mod witness;
-pub use witness::Witness;
+pub use witness::TriptychWitness;

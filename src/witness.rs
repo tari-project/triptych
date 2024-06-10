@@ -8,22 +8,22 @@ use rand_core::CryptoRngCore;
 use snafu::prelude::*;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use crate::Parameters;
+use crate::TriptychParameters;
 
 /// A Triptych proof witness.
 ///
 /// The witness consists of a signing key and an index where the corresponding verification key will appear in  the
-/// [`InputSet`](`crate::statement::InputSet`) of a [`Statement`](`crate::statement::Statement`). It also contains
-/// [`Parameters`].
+/// [`TriptychInputSet`](`crate::statement::TriptychInputSet`) of a
+/// [`TriptychStatement`](`crate::statement::TriptychStatement`). It also contains [`TriptychParameters`].
 #[derive(Zeroize, ZeroizeOnDrop)]
-pub struct Witness {
+pub struct TriptychWitness {
     #[zeroize(skip)]
-    params: Arc<Parameters>,
+    params: Arc<TriptychParameters>,
     l: u32,
     r: Scalar,
 }
 
-/// Errors that can arise relating to [`Witness`].
+/// Errors that can arise relating to [`TriptychWitness`].
 #[derive(Debug, Snafu)]
 pub enum WitnessError {
     /// An invalid parameter was provided.
@@ -31,15 +31,15 @@ pub enum WitnessError {
     InvalidParameter,
 }
 
-impl Witness {
-    /// Generate a new [`Witness`] from secret data.
+impl TriptychWitness {
+    /// Generate a new [`TriptychWitness`] from secret data.
     ///
-    /// The signing key `r` must be nonzero, and the index `l` must be valid for the [`Parameters`] `params`.
+    /// The signing key `r` must be nonzero, and the index `l` must be valid for the [`TriptychParameters`] `params`.
     /// If any of these conditions is not met, returns a [`WitnessError`].
     ///
-    /// If you'd like a [`Witness`] generated securely for you, use [`Witness::random`] instead.
+    /// If you'd like a [`TriptychWitness`] generated securely for you, use [`TriptychWitness::random`] instead.
     #[allow(non_snake_case)]
-    pub fn new(params: &Arc<Parameters>, l: u32, r: &Scalar) -> Result<Self, WitnessError> {
+    pub fn new(params: &Arc<TriptychParameters>, l: u32, r: &Scalar) -> Result<Self, WitnessError> {
         if r == &Scalar::ZERO {
             return Err(WitnessError::InvalidParameter);
         }
@@ -54,14 +54,14 @@ impl Witness {
         })
     }
 
-    /// Generate a new random [`Witness`].
+    /// Generate a new random [`TriptychWitness`].
     ///
-    /// You must provide [`Parameters`] `params` and a [`CryptoRngCore`] random number generator `rng`.
-    /// This will generate a [`Witness`] with a cryptographically-secure signing key and random index.
+    /// You must provide [`TriptychParameters`] `params` and a [`CryptoRngCore`] random number generator `rng`.
+    /// This will generate a [`TriptychWitness`] with a cryptographically-secure signing key and random index.
     ///
-    /// If you'd rather provide your own secret data, use [`Witness::new`] instead.
+    /// If you'd rather provide your own secret data, use [`TriptychWitness::new`] instead.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn random<R: CryptoRngCore>(params: &Arc<Parameters>, rng: &mut R) -> Self {
+    pub fn random<R: CryptoRngCore>(params: &Arc<TriptychParameters>, rng: &mut R) -> Self {
         // Generate a random index using wide reduction
         // This can't truncate since `N` is bounded by `u32`
         // It is also defined since `N > 0`
@@ -75,28 +75,28 @@ impl Witness {
         }
     }
 
-    /// Get the [`Parameters`] from this [`Witness`].
-    pub fn get_params(&self) -> &Arc<Parameters> {
+    /// Get the [`TriptychParameters`] from this [`TriptychWitness`].
+    pub fn get_params(&self) -> &Arc<TriptychParameters> {
         &self.params
     }
 
-    /// Get the index from this [`Witness`].
+    /// Get the index from this [`TriptychWitness`].
     pub fn get_l(&self) -> u32 {
         self.l
     }
 
-    /// Get the signing key from this [`Witness`].
+    /// Get the signing key from this [`TriptychWitness`].
     pub fn get_r(&self) -> &Scalar {
         &self.r
     }
 
-    /// Compute the linking tag for the [`Witness`] signing key.
+    /// Compute the linking tag for the [`TriptychWitness`] signing key.
     #[allow(non_snake_case)]
     pub fn compute_linking_tag(&self) -> RistrettoPoint {
         *Zeroizing::new(self.r.invert()) * self.params.get_U()
     }
 
-    /// Compute the verification key for the [`Witness`] signing key.
+    /// Compute the verification key for the [`TriptychWitness`] signing key.
     pub fn compute_verification_key(&self) -> RistrettoPoint {
         self.r * self.params.get_G()
     }
