@@ -15,10 +15,10 @@ use itertools::izip;
 use rand_chacha::ChaCha12Rng;
 use rand_core::{CryptoRngCore, SeedableRng};
 use triptych::{
-    parameters::Parameters,
-    proof::Proof,
-    statement::{InputSet, Statement},
-    witness::Witness,
+    parameters::TriptychParameters,
+    proof::TriptychProof,
+    statement::{TriptychInputSet, TriptychStatement},
+    witness::TriptychWitness,
     Transcript,
 };
 
@@ -31,19 +31,19 @@ const BATCH_SIZES: [usize; 1] = [2];
 #[allow(non_snake_case)]
 #[allow(clippy::arithmetic_side_effects)]
 fn generate_data<R: CryptoRngCore>(
-    params: &Arc<Parameters>,
+    params: &Arc<TriptychParameters>,
     b: usize,
     rng: &mut R,
-) -> (Vec<Witness>, Vec<Statement>, Vec<Transcript>) {
+) -> (Vec<TriptychWitness>, Vec<TriptychStatement>, Vec<Transcript>) {
     // Generate witnesses; for this test, we use adjacent indexes for simplicity
     // This means the batch size must not exceed the input set size!
     assert!(b <= params.get_N() as usize);
     let mut witnesses = Vec::with_capacity(b);
-    witnesses.push(Witness::random(params, rng));
+    witnesses.push(TriptychWitness::random(params, rng));
     for _ in 1..b {
         let r = Scalar::random(rng);
         let l = (witnesses.last().unwrap().get_l() + 1) % params.get_N();
-        witnesses.push(Witness::new(params, l, &r).unwrap());
+        witnesses.push(TriptychWitness::new(params, l, &r).unwrap());
     }
 
     // Generate input set from all witnesses
@@ -53,13 +53,13 @@ fn generate_data<R: CryptoRngCore>(
     for witness in &witnesses {
         M[witness.get_l() as usize] = witness.compute_verification_key();
     }
-    let input_set = Arc::new(InputSet::new(&M));
+    let input_set = Arc::new(TriptychInputSet::new(&M));
 
     // Generate statements
     let mut statements = Vec::with_capacity(b);
     for witness in &witnesses {
         let J = witness.compute_linking_tag();
-        statements.push(Statement::new(params, &input_set, &J).unwrap());
+        statements.push(TriptychStatement::new(params, &input_set, &J).unwrap());
     }
 
     // Generate transcripts
@@ -84,7 +84,7 @@ fn generate_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(Parameters::new(n, m).unwrap());
+            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
 
             let label = format!("Generate proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
@@ -96,7 +96,7 @@ fn generate_proof(c: &mut Criterion) {
                     || transcripts[0].clone(),
                     |t| {
                         // Generate the proof
-                        Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                        TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, t).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -115,7 +115,7 @@ fn generate_proof_vartime(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(Parameters::new(n, m).unwrap());
+            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
 
             let label = format!(
                 "Generate proof (variable time): n = {}, m = {} (N = {})",
@@ -132,7 +132,7 @@ fn generate_proof_vartime(c: &mut Criterion) {
                     || transcripts[0].clone(),
                     |t| {
                         // Generate the proof
-                        Proof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, t).unwrap();
+                        TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, t).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -151,7 +151,7 @@ fn verify_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(Parameters::new(n, m).unwrap());
+            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
 
             let label = format!("Verify proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
@@ -159,8 +159,9 @@ fn verify_proof(c: &mut Criterion) {
                 let (witnesses, statements, transcripts) = generate_data(&params, 1, &mut rng);
 
                 // Generate the proof
-                let proof = Proof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                    .unwrap();
+                let proof =
+                    TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+                        .unwrap();
 
                 // Start the benchmark
                 b.iter_batched_ref(
@@ -186,7 +187,7 @@ fn verify_batch_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(Parameters::new(n, m).unwrap());
+            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
 
             for batch in BATCH_SIZES {
                 let label = format!(
@@ -202,15 +203,15 @@ fn verify_batch_proof(c: &mut Criterion) {
 
                     // Generate the proofs
                     let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-                        .map(|(w, s, t)| Proof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
-                        .collect::<Vec<Proof>>();
+                        .map(|(w, s, t)| TriptychProof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+                        .collect::<Vec<TriptychProof>>();
 
                     // Start the benchmark
                     b.iter_batched_ref(
                         || transcripts.clone(),
                         |t| {
                             // Verify the proofs in a batch
-                            assert!(Proof::verify_batch(&statements, &proofs, t).is_ok());
+                            assert!(TriptychProof::verify_batch(&statements, &proofs, t).is_ok());
                         },
                         BatchSize::SmallInput,
                     )

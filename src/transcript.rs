@@ -7,7 +7,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use merlin::TranscriptRng;
 use rand_core::CryptoRngCore;
 
-use crate::{proof::ProofError, Parameters, Statement, Transcript, Witness};
+use crate::{proof::ProofError, Transcript, TriptychParameters, TriptychStatement, TriptychWitness};
 
 // Version identifier
 const VERSION: u64 = 0;
@@ -18,7 +18,7 @@ const DOMAIN: &str = "Triptych proof";
 /// A Triptych proof transcript.
 pub(crate) struct ProofTranscript<'a, R: CryptoRngCore> {
     transcript: &'a mut Transcript,
-    witness: Option<&'a Witness>,
+    witness: Option<&'a TriptychWitness>,
     transcript_rng: TranscriptRng,
     external_rng: &'a mut R,
 }
@@ -27,9 +27,9 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
     /// Initialize a transcript.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
-        statement: &Statement,
+        statement: &TriptychStatement,
         external_rng: &'a mut R,
-        witness: Option<&'a Witness>,
+        witness: Option<&'a TriptychWitness>,
     ) -> Self {
         // Update the transcript
         transcript.append_message(b"dom-sep", DOMAIN.as_bytes());
@@ -53,7 +53,7 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
     #[allow(non_snake_case, clippy::too_many_arguments)]
     pub(crate) fn commit(
         &mut self,
-        params: &Parameters,
+        params: &TriptychParameters,
         A: &RistrettoPoint,
         B: &RistrettoPoint,
         C: &RistrettoPoint,
@@ -123,7 +123,11 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
     }
 
     /// Build a random number generator from a transcript, optionally binding in witness data.
-    fn build_transcript_rng(transcript: &Transcript, witness: Option<&Witness>, external_rng: &mut R) -> TranscriptRng {
+    fn build_transcript_rng(
+        transcript: &Transcript,
+        witness: Option<&TriptychWitness>,
+        external_rng: &mut R,
+    ) -> TranscriptRng {
         if let Some(witness) = witness {
             transcript
                 .build_rng()

@@ -7,7 +7,7 @@ use blake3::Hasher;
 use curve25519_dalek::{traits::Identity, RistrettoPoint};
 use snafu::prelude::*;
 
-use crate::Parameters;
+use crate::TriptychParameters;
 
 /// A Triptych input set.
 ///
@@ -15,16 +15,16 @@ use crate::Parameters;
 /// Internally, it also contains cryptographic hash data to make proofs more efficient.
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct InputSet {
+pub struct TriptychInputSet {
     M: Vec<RistrettoPoint>,
     hash: Vec<u8>,
 }
 
-impl InputSet {
+impl TriptychInputSet {
     // Version identifier used for hashing
     const VERSION: u64 = 0;
 
-    /// Generate a new [`InputSet`] from a slice `M` of verification keys.
+    /// Generate a new [`TriptychInputSet`] from a slice `M` of verification keys.
     #[allow(non_snake_case)]
     pub fn new(M: &[RistrettoPoint]) -> Self {
         // Use `BLAKE3` for the transcript hash
@@ -41,14 +41,15 @@ impl InputSet {
         }
     }
 
-    /// Generate a new padded [`InputSet`] from a slice `M` of verification keys and [`Parameters`] `params`.
+    /// Generate a new padded [`TriptychInputSet`] from a slice `M` of verification keys and [`TriptychParameters`]
+    /// `params`.
     ///
     /// If the verification key vector is shorter than specified by `params`, it will be padded by repeating the last
-    /// element. If your use case cannot safely allow this, use [`InputSet::new`] instead.
+    /// element. If your use case cannot safely allow this, use [`TriptychInputSet::new`] instead.
     ///
     /// If the verification key vector is empty or longer than specified by `params`, returns a [`StatementError`].
     #[allow(non_snake_case)]
-    pub fn new_with_padding(M: &[RistrettoPoint], params: &Parameters) -> Result<Self, StatementError> {
+    pub fn new_with_padding(M: &[RistrettoPoint], params: &TriptychParameters) -> Result<Self, StatementError> {
         // We cannot have the vector be too long
         if M.len() > params.get_N() as usize {
             return Err(StatementError::InvalidParameter);
@@ -63,12 +64,12 @@ impl InputSet {
         Ok(Self::new(&M_padded))
     }
 
-    /// Get the verification keys for this [`InputSet`].
+    /// Get the verification keys for this [`TriptychInputSet`].
     pub fn get_keys(&self) -> &[RistrettoPoint] {
         &self.M
     }
 
-    /// Get a cryptographic hash representation of this [`InputSet`], suitable for transcripting.
+    /// Get a cryptographic hash representation of this [`TriptychInputSet`], suitable for transcripting.
     pub(crate) fn get_hash(&self) -> &[u8] {
         &self.hash
     }
@@ -76,17 +77,17 @@ impl InputSet {
 
 /// A Triptych proof statement.
 ///
-/// The statement consists of an [`InputSet`] of verification keys and a linking tag.
-/// It also contains [`Parameters`] that, among other things, enforce the size of the [`InputSet`].
+/// The statement consists of an [`TriptychInputSet`] of verification keys and a linking tag.
+/// It also contains [`TriptychParameters`] that, among other things, enforce the size of the [`TriptychInputSet`].
 #[allow(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
-pub struct Statement {
-    params: Arc<Parameters>,
-    input_set: Arc<InputSet>,
+pub struct TriptychStatement {
+    params: Arc<TriptychParameters>,
+    input_set: Arc<TriptychInputSet>,
     J: RistrettoPoint,
 }
 
-/// Errors that can arise relating to [`Statement`].
+/// Errors that can arise relating to [`TriptychStatement`].
 #[derive(Debug, Snafu)]
 pub enum StatementError {
     /// An invalid parameter was provided.
@@ -94,20 +95,20 @@ pub enum StatementError {
     InvalidParameter,
 }
 
-impl Statement {
-    /// Generate a new [`Statement`].
+impl TriptychStatement {
+    /// Generate a new [`TriptychStatement`].
     ///
-    /// The [`InputSet`] `input_set` must have a verification key vector whose size matches that specified by the
-    /// [`Parameters`] `params`, and which does not contain the identity group element.
+    /// The [`TriptychInputSet`] `input_set` must have a verification key vector whose size matches that specified by
+    /// the [`TriptychParameters`] `params`, and which does not contain the identity group element.
     /// If either of these conditions is not met, returns a [`StatementError`].
     ///
     /// The linking tag `J` is assumed to have been computed from
-    /// [`Witness::compute_linking_tag`](`crate::witness::Witness::compute_linking_tag`) data or otherwise provided
-    /// externally.
+    /// [`TriptychWitness::compute_linking_tag`](`crate::witness::TriptychWitness::compute_linking_tag`) data or
+    /// otherwise provided externally.
     #[allow(non_snake_case)]
     pub fn new(
-        params: &Arc<Parameters>,
-        input_set: &Arc<InputSet>,
+        params: &Arc<TriptychParameters>,
+        input_set: &Arc<TriptychInputSet>,
         J: &RistrettoPoint,
     ) -> Result<Self, StatementError> {
         // Check that the input vector is valid against the parameters
@@ -125,17 +126,17 @@ impl Statement {
         })
     }
 
-    /// Get the parameters for this [`Statement`].
-    pub fn get_params(&self) -> &Arc<Parameters> {
+    /// Get the parameters for this [`TriptychStatement`].
+    pub fn get_params(&self) -> &Arc<TriptychParameters> {
         &self.params
     }
 
-    /// Get the input set for this [`Statement`].
-    pub fn get_input_set(&self) -> &Arc<InputSet> {
+    /// Get the input set for this [`TriptychStatement`].
+    pub fn get_input_set(&self) -> &Arc<TriptychInputSet> {
         &self.input_set
     }
 
-    /// Get the linking tag for this [`Statement`].
+    /// Get the linking tag for this [`TriptychStatement`].
     #[allow(non_snake_case)]
     pub fn get_J(&self) -> &RistrettoPoint {
         &self.J
@@ -150,7 +151,7 @@ mod test {
     use rand_chacha::ChaCha12Rng;
     use rand_core::SeedableRng;
 
-    use crate::{InputSet, Parameters};
+    use crate::{TriptychInputSet, TriptychParameters};
 
     // Helper function to generate random vectors
     fn random_vector(size: usize) -> Vec<RistrettoPoint> {
@@ -165,27 +166,30 @@ mod test {
     #[allow(non_snake_case)]
     fn test_padding() {
         // Generate parameters
-        let params = Parameters::new(2, 4).unwrap();
+        let params = TriptychParameters::new(2, 4).unwrap();
         let N = params.get_N() as usize;
 
         // Vector is empty
-        assert!(InputSet::new_with_padding(&[], &params).is_err());
+        assert!(TriptychInputSet::new_with_padding(&[], &params).is_err());
 
         // Vector is too long
         let M = random_vector(N + 1);
-        assert!(InputSet::new_with_padding(&M, &params).is_err());
+        assert!(TriptychInputSet::new_with_padding(&M, &params).is_err());
 
         // Vector is the right size
         let M = random_vector(N);
-        assert_eq!(InputSet::new_with_padding(&M, &params).unwrap(), InputSet::new(&M));
+        assert_eq!(
+            TriptychInputSet::new_with_padding(&M, &params).unwrap(),
+            TriptychInputSet::new(&M)
+        );
 
         // Vector is padded
         let M = random_vector(N - 1);
         let mut M_padded = M.clone();
         M_padded.push(M.last().unwrap().to_owned());
         assert_eq!(
-            InputSet::new_with_padding(&M, &params).unwrap(),
-            InputSet::new(&M_padded)
+            TriptychInputSet::new_with_padding(&M, &params).unwrap(),
+            TriptychInputSet::new(&M_padded)
         );
     }
 }
