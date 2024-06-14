@@ -24,3 +24,9 @@ name = "proofs"
 path = "fuzz_targets/proofs.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "parallel"
+path = "fuzz_targets/parallel.rs"
+test = false
+doc = false
