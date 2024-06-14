@@ -5,7 +5,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use triptych::proof::TriptychProof;
+use triptych::parallel::proof::TriptychProof;
 
 // Test basic deserialization and canonical serialization
 fuzz_target!(|data: &[u8]| {
