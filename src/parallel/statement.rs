@@ -28,23 +28,13 @@ impl TriptychInputSet {
     /// Generate a new [`TriptychInputSet`] from a slice `M` of verification keys and slice `M1` of auxiliary
     /// verification keys.
     #[allow(non_snake_case)]
-    pub fn new(M: &[RistrettoPoint], M1: &[RistrettoPoint]) -> Self {
-        // Use `BLAKE3` for the transcript hash
-        let mut hasher = Hasher::new();
-        hasher.update(b"Parallel Triptych InputSet");
-        hasher.update(&Self::VERSION.to_le_bytes());
-        for item in M {
-            hasher.update(item.compress().as_bytes());
-        }
-        for item in M1 {
-            hasher.update(item.compress().as_bytes());
+    pub fn new(M: &[RistrettoPoint], M1: &[RistrettoPoint]) -> Result<Self, StatementError> {
+        // The verification key vectors must be the same length
+        if M.len() != M1.len() {
+            return Err(StatementError::InvalidParameter);
         }
 
-        Self {
-            M: M.to_vec(),
-            M1: M1.to_vec(),
-            hash: hasher.finalize().as_bytes().to_vec(),
-        }
+        Self::new_internal(M, M1, M.len())
     }
 
     /// Generate a new padded [`TriptychInputSet`] from a slice `M` of verification keys, a slice `M1` of auxiliary
@@ -67,8 +57,11 @@ impl TriptychInputSet {
             return Err(StatementError::InvalidParameter);
         }
 
+        // Get the unpadded size
+        let unpadded_size = M.len();
+
         // We cannot have the vectors be too long
-        if M.len() > params.get_N() as usize {
+        if unpadded_size > params.get_N() as usize {
             return Err(StatementError::InvalidParameter);
         }
 
@@ -82,7 +75,32 @@ impl TriptychInputSet {
         let mut M1_padded = M1.to_vec();
         M1_padded.resize(params.get_N() as usize, *last1);
 
-        Ok(Self::new(&M_padded, &M1_padded))
+        Self::new_internal(&M_padded, &M1_padded, unpadded_size)
+    }
+
+    // Helper function to do the actual generation
+    #[allow(non_snake_case)]
+    fn new_internal(M: &[RistrettoPoint], M1: &[RistrettoPoint], unpadded_size: usize) -> Result<Self, StatementError> {
+        // Ensure the verification key vector lengths don't overflow
+        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter)?;
+
+        // Use `BLAKE3` for the transcript hash
+        let mut hasher = Hasher::new();
+        hasher.update(b"Parallel Triptych InputSet");
+        hasher.update(&Self::VERSION.to_le_bytes());
+        hasher.update(&unpadded_size.to_le_bytes());
+        for item in M {
+            hasher.update(item.compress().as_bytes());
+        }
+        for item in M1 {
+            hasher.update(item.compress().as_bytes());
+        }
+
+        Ok(Self {
+            M: M.to_vec(),
+            M1: M1.to_vec(),
+            hash: hasher.finalize().as_bytes().to_vec(),
+        })
     }
 
     /// Get the verification keys for this [`TriptychInputSet`].
@@ -226,7 +244,7 @@ mod test {
         let M1 = random_vector(N);
         assert_eq!(
             TriptychInputSet::new_with_padding(&M, &M1, &params).unwrap(),
-            TriptychInputSet::new(&M, &M1)
+            TriptychInputSet::new(&M, &M1).unwrap()
         );
 
         // Vectors are padded
@@ -237,8 +255,20 @@ mod test {
         let mut M1_padded = M1.clone();
         M1_padded.push(M1.last().unwrap().to_owned());
         assert_eq!(
-            TriptychInputSet::new_with_padding(&M, &M1, &params).unwrap(),
-            TriptychInputSet::new(&M_padded, &M1_padded)
+            TriptychInputSet::new_with_padding(&M, &M1, &params).unwrap().get_keys(),
+            TriptychInputSet::new(&M_padded, &M1_padded).unwrap().get_keys()
         );
+        assert_eq!(
+            TriptychInputSet::new_with_padding(&M, &M1, &params)
+                .unwrap()
+                .get_auxiliary_keys(),
+            TriptychInputSet::new(&M_padded, &M1_padded)
+                .unwrap()
+                .get_auxiliary_keys()
+        );
+        assert_ne!(
+            TriptychInputSet::new_with_padding(&M, &M1, &params).unwrap().get_hash(),
+            TriptychInputSet::new(&M_padded, &M1_padded).unwrap().get_hash()
+        )
     }
 }

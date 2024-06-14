@@ -63,7 +63,7 @@ fn generate_data<R: CryptoRngCore>(
         offsets.push(r_offset * params.get_H());
         M1[witness.get_l() as usize] = witness.compute_auxiliary_verification_key() + offsets.last().unwrap();
     }
-    let input_set = Arc::new(TriptychInputSet::new(&M, &M1));
+    let input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
 
     // Generate statements
     let mut statements = Vec::with_capacity(b);

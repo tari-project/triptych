@@ -26,19 +26,8 @@ impl TriptychInputSet {
 
     /// Generate a new [`TriptychInputSet`] from a slice `M` of verification keys.
     #[allow(non_snake_case)]
-    pub fn new(M: &[RistrettoPoint]) -> Self {
-        // Use `BLAKE3` for the transcript hash
-        let mut hasher = Hasher::new();
-        hasher.update(b"Triptych InputSet");
-        hasher.update(&Self::VERSION.to_le_bytes());
-        for item in M {
-            hasher.update(item.compress().as_bytes());
-        }
-
-        Self {
-            M: M.to_vec(),
-            hash: hasher.finalize().as_bytes().to_vec(),
-        }
+    pub fn new(M: &[RistrettoPoint]) -> Result<Self, StatementError> {
+        Self::new_internal(M, M.len())
     }
 
     /// Generate a new padded [`TriptychInputSet`] from a slice `M` of verification keys and [`TriptychParameters`]
@@ -50,8 +39,11 @@ impl TriptychInputSet {
     /// If the verification key vector is empty or longer than specified by `params`, returns a [`StatementError`].
     #[allow(non_snake_case)]
     pub fn new_with_padding(M: &[RistrettoPoint], params: &TriptychParameters) -> Result<Self, StatementError> {
+        // Get the unpadded size
+        let unpadded_size = M.len();
+
         // We cannot have the vector be too long
-        if M.len() > params.get_N() as usize {
+        if unpadded_size > params.get_N() as usize {
             return Err(StatementError::InvalidParameter);
         }
 
@@ -61,7 +53,29 @@ impl TriptychInputSet {
         // Pad the vector with the last element
         let mut M_padded = M.to_vec();
         M_padded.resize(params.get_N() as usize, *last);
-        Ok(Self::new(&M_padded))
+
+        Self::new_internal(&M_padded, unpadded_size)
+    }
+
+    // Helper function to do the actual generation
+    #[allow(non_snake_case)]
+    fn new_internal(M: &[RistrettoPoint], unpadded_size: usize) -> Result<Self, StatementError> {
+        // Ensure the verification key vector length doesn't overflow
+        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter)?;
+
+        // Use `BLAKE3` for the transcript hash
+        let mut hasher = Hasher::new();
+        hasher.update(b"Triptych InputSet");
+        hasher.update(&Self::VERSION.to_le_bytes());
+        hasher.update(&unpadded_size.to_le_bytes());
+        for item in M {
+            hasher.update(item.compress().as_bytes());
+        }
+
+        Ok(Self {
+            M: M.to_vec(),
+            hash: hasher.finalize().as_bytes().to_vec(),
+        })
     }
 
     /// Get the verification keys for this [`TriptychInputSet`].
@@ -180,7 +194,7 @@ mod test {
         let M = random_vector(N);
         assert_eq!(
             TriptychInputSet::new_with_padding(&M, &params).unwrap(),
-            TriptychInputSet::new(&M)
+            TriptychInputSet::new(&M).unwrap()
         );
 
         // Vector is padded
@@ -188,8 +202,12 @@ mod test {
         let mut M_padded = M.clone();
         M_padded.push(M.last().unwrap().to_owned());
         assert_eq!(
-            TriptychInputSet::new_with_padding(&M, &params).unwrap(),
-            TriptychInputSet::new(&M_padded)
+            TriptychInputSet::new_with_padding(&M, &params).unwrap().get_keys(),
+            TriptychInputSet::new(&M_padded).unwrap().get_keys()
         );
+        assert_ne!(
+            TriptychInputSet::new_with_padding(&M, &params).unwrap().get_hash(),
+            TriptychInputSet::new(&M_padded).unwrap().get_hash()
+        )
     }
 }

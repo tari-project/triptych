@@ -91,7 +91,7 @@
 //!         }
 //!     })
 //!     .collect::<Vec<RistrettoPoint>>();
-//! let input_set = Arc::new(TriptychInputSet::new(&M));
+//! let input_set = Arc::new(TriptychInputSet::new(&M).unwrap());
 //!
 //! // Generate the statement, which includes the verification key vector and linking tag
 //! let J = witness.compute_linking_tag();
