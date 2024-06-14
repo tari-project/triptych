@@ -25,6 +25,8 @@
 //! It's possible to use the Fiat-Shamir transformation to produce a non-interactive protocol that can additionally bind
 //! an arbitrary message into the transcript. This produces the linkable ring signature.
 //!
+//! This library also supports [parallel proving functionality](`crate::parallel`).
+//!
 //! # Implementation notes
 //!
 //! This implementation makes several opinionated choices:
@@ -130,3 +132,6 @@ pub(crate) mod util;
 /// Triptych proof witnesses.
 pub mod witness;
 pub use witness::TriptychWitness;
+
+/// Parallel Triptych functionality.
+pub mod parallel;
