@@ -39,6 +39,7 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
         transcript.append_u64(b"version", VERSION);
         transcript.append_message(b"params", statement.get_params().get_hash());
         transcript.append_message(b"M", statement.get_input_set().get_hash());
+        transcript.append_message(b"offset", statement.get_offset().compress().as_bytes());
         transcript.append_message(b"J", statement.get_J().compress().as_bytes());
 
         // Set up the transcript generator
