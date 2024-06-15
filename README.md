@@ -21,6 +21,8 @@ The Triptych proving system protocol is a sigma protocol for the following relat
 It's possible to use the Fiat-Shamir transformation to produce a non-interactive protocol that can additionally bind an arbitrary message into the transcript.
 This produces the linkable ring signature.
 
+This library also supports parallel proving functionality.
+
 ## Implementation notes
 
 This implementation makes several opinionated choices:
