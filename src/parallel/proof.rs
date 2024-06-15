@@ -1071,7 +1071,7 @@ mod test {
             offsets.push(r_offset * params.get_H());
             M1[witness.get_l() as usize] = witness.compute_auxiliary_verification_key() + offsets.last().unwrap();
         }
-        let input_set = Arc::new(TriptychInputSet::new(&M, &M1));
+        let input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
 
         // Generate statements
         let mut statements = Vec::with_capacity(b);
@@ -1332,7 +1332,7 @@ mod test {
         let M1 = statements[0].get_input_set().get_auxiliary_keys().to_vec();
         let index = ((witnesses[0].get_l() + 1) % witnesses[0].get_params().get_N()) as usize;
         M[index] = RistrettoPoint::random(&mut rng);
-        let evil_input_set = Arc::new(TriptychInputSet::new(&M, &M1));
+        let evil_input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
         let evil_statement = TriptychStatement::new(
             statements[0].get_params(),
             &evil_input_set,
@@ -1364,7 +1364,7 @@ mod test {
         let mut M1 = statements[0].get_input_set().get_auxiliary_keys().to_vec();
         let index = ((witnesses[0].get_l() + 1) % witnesses[0].get_params().get_N()) as usize;
         M1[index] = RistrettoPoint::random(&mut rng);
-        let evil_input_set = Arc::new(TriptychInputSet::new(&M, &M1));
+        let evil_input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
         let evil_statement = TriptychStatement::new(
             statements[0].get_params(),
             &evil_input_set,
