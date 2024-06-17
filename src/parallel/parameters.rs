@@ -1,7 +1,7 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::iter::once;
 
 use blake3::Hasher;
@@ -13,7 +13,7 @@ use curve25519_dalek::{
 };
 use snafu::prelude::*;
 
-use crate::util::OperationTiming;
+use crate::{util::OperationTiming, Transcript, TRANSCRIPT_HASH_BYTES};
 
 /// Public parameters used for generating and verifying Triptych proofs.
 ///
@@ -43,6 +43,8 @@ pub enum ParameterError {
 }
 
 impl TriptychParameters {
+    // Domain separator used for hashing
+    const DOMAIN: &'static str = "Parallel Triptych parameters";
     // Version identifier used for hashing
     const VERSION: u64 = 0;
 
@@ -126,19 +128,20 @@ impl TriptychParameters {
             })
             .collect::<Vec<RistrettoPoint>>();
 
-        // Use `BLAKE3` for the transcript hash
-        let mut hasher = Hasher::new();
-        hasher.update(b"Parallel Triptych Parameters");
-        hasher.update(&Self::VERSION.to_le_bytes());
-        hasher.update(&n.to_le_bytes());
-        hasher.update(&m.to_le_bytes());
-        hasher.update(G.compress().as_bytes());
-        hasher.update(H.compress().as_bytes());
-        hasher.update(U.compress().as_bytes());
+        // Use Merlin for the transcript hash
+        let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
+        transcript.append_u64(b"version", Self::VERSION);
+        transcript.append_message(b"n", &n.to_le_bytes());
+        transcript.append_message(b"m", &m.to_le_bytes());
+        transcript.append_message(b"G", G.compress().as_bytes());
+        transcript.append_message(b"H", H.compress().as_bytes());
+        transcript.append_message(b"U", U.compress().as_bytes());
         for item in &CommitmentG {
-            hasher.update(item.compress().as_bytes());
+            transcript.append_message(b"CommitmentG", item.compress().as_bytes());
         }
-        hasher.update(CommitmentH.compress().as_bytes());
+        transcript.append_message(b"CommitmentH", CommitmentH.compress().as_bytes());
+        let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
+        transcript.challenge_bytes(b"hash", &mut hash);
 
         Ok(TriptychParameters {
             n,
@@ -148,7 +151,7 @@ impl TriptychParameters {
             U: *U,
             CommitmentG,
             CommitmentH,
-            hash: hasher.finalize().as_bytes().to_vec(),
+            hash,
         })
     }
 

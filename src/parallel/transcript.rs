@@ -12,12 +12,6 @@ use crate::{
     Transcript,
 };
 
-// Version identifier
-const VERSION: u64 = 0;
-
-// Domain separator
-const DOMAIN: &str = "Parallel Triptych proof";
-
 /// A Triptych proof transcript.
 pub(crate) struct ProofTranscript<'a, R: CryptoRngCore> {
     transcript: &'a mut Transcript,
@@ -27,6 +21,11 @@ pub(crate) struct ProofTranscript<'a, R: CryptoRngCore> {
 }
 
 impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
+    // Domain separator used for hashing
+    const DOMAIN: &'static str = "Parallel Triptych proof";
+    // Version identifier used for hashing
+    const VERSION: u64 = 0;
+
     /// Initialize a transcript.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
@@ -35,12 +34,9 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
         witness: Option<&'a TriptychWitness>,
     ) -> Self {
         // Update the transcript
-        transcript.append_message(b"dom-sep", DOMAIN.as_bytes());
-        transcript.append_u64(b"version", VERSION);
-        transcript.append_message(b"params", statement.get_params().get_hash());
-        transcript.append_message(b"M", statement.get_input_set().get_hash());
-        transcript.append_message(b"offset", statement.get_offset().compress().as_bytes());
-        transcript.append_message(b"J", statement.get_J().compress().as_bytes());
+        transcript.append_message(b"dom-sep", Self::DOMAIN.as_bytes());
+        transcript.append_u64(b"version", Self::VERSION);
+        transcript.append_message(b"statement", statement.get_hash());
 
         // Set up the transcript generator
         let transcript_rng = Self::build_transcript_rng(transcript, witness, external_rng);
