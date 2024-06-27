@@ -1,6 +1,15 @@
 on: [push, pull_request]
 name: CI
 jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install audit
+        run: cargo install cargo-audit
+      - name: Audit
+        run: cargo audit
   format:
     runs-on: ubuntu-latest
     steps:
