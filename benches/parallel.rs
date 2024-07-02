@@ -60,7 +60,7 @@ fn generate_data<R: CryptoRngCore>(
     for witness in &witnesses {
         M[witness.get_l() as usize] = witness.compute_verification_key();
         let r_offset = Scalar::random(rng);
-        offsets.push(r_offset * params.get_H());
+        offsets.push(r_offset * params.get_G1());
         M1[witness.get_l() as usize] = witness.compute_auxiliary_verification_key() + offsets.last().unwrap();
     }
     let input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
