@@ -37,3 +37,8 @@ harness = false
 [[bench]]
 name = "parallel"
 harness = false
+
+[[example]]
+name = "ringct"
+crate-type = ["staticlib"]
+test = true
