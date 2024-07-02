@@ -27,7 +27,7 @@ pub struct TriptychParameters {
     n: u32,
     m: u32,
     G: RistrettoPoint,
-    H: RistrettoPoint,
+    G1: RistrettoPoint,
     U: RistrettoPoint,
     CommitmentG: Vec<RistrettoPoint>,
     CommitmentH: RistrettoPoint,
@@ -53,19 +53,19 @@ impl TriptychParameters {
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
     /// `n**m` does not overflow [`prim@u32`]. If any of these conditions is not met, returns a [`ParameterError`].
     ///
-    /// This function produces group generators `G`, `H` and `U` for you.
+    /// This function produces group generators `G`, `G1` and `U` for you.
     /// If your use case requires specific generators, use [`TriptychParameters::new_with_generators`] instead.
     #[allow(non_snake_case)]
     pub fn new(n: u32, m: u32) -> Result<Self, ParameterError> {
         // Use the default base point for `G` (this is arbitrary)
         let G = RISTRETTO_BASEPOINT_POINT;
 
-        // Use `BLAKE3` to generate `H`
-        let mut H_bytes = [0u8; 64];
+        // Use `BLAKE3` to generate `G1`
+        let mut G1_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update(b"Triptych H");
-        hasher.finalize_xof().fill(&mut H_bytes);
-        let H = RistrettoPoint::from_uniform_bytes(&H_bytes);
+        hasher.update(b"Triptych G1");
+        hasher.finalize_xof().fill(&mut G1_bytes);
+        let G1 = RistrettoPoint::from_uniform_bytes(&G1_bytes);
 
         // Use `BLAKE3` to generate `U`
         let mut U_bytes = [0u8; 64];
@@ -74,7 +74,7 @@ impl TriptychParameters {
         hasher.finalize_xof().fill(&mut U_bytes);
         let U = RistrettoPoint::from_uniform_bytes(&U_bytes);
 
-        Self::new_with_generators(n, m, &G, &H, &U)
+        Self::new_with_generators(n, m, &G, &G1, &U)
     }
 
     /// Generate new [`TriptychParameters`] for Triptych proofs.
@@ -82,9 +82,9 @@ impl TriptychParameters {
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
     /// `n**m` does not overflow [`prim@u32`]. If any of these conditions is not met, returns a [`ParameterError`].
     ///
-    /// You must also provide independent group generators `G`, `H` and `U`:
+    /// You must also provide independent group generators `G`, `G1` and `U`:
     /// - The generator `G` is used to define verification keys.
-    /// - The generator `H` is used to define auxiliary verification keys.
+    /// - The generator `G1` is used to define auxiliary verification keys.
     /// - The generator `U` is used to define linking tags.
     ///
     /// The security of these generators cannot be checked by this function.
@@ -94,7 +94,7 @@ impl TriptychParameters {
         n: u32,
         m: u32,
         G: &RistrettoPoint,
-        H: &RistrettoPoint,
+        G1: &RistrettoPoint,
         U: &RistrettoPoint,
     ) -> Result<Self, ParameterError> {
         // These bounds are required by the protocol
@@ -134,7 +134,7 @@ impl TriptychParameters {
         transcript.append_message(b"n", &n.to_le_bytes());
         transcript.append_message(b"m", &m.to_le_bytes());
         transcript.append_message(b"G", G.compress().as_bytes());
-        transcript.append_message(b"H", H.compress().as_bytes());
+        transcript.append_message(b"G1", G1.compress().as_bytes());
         transcript.append_message(b"U", U.compress().as_bytes());
         for item in &CommitmentG {
             transcript.append_message(b"CommitmentG", item.compress().as_bytes());
@@ -147,7 +147,7 @@ impl TriptychParameters {
             n,
             m,
             G: *G,
-            H: *H,
+            G1: *G1,
             U: *U,
             CommitmentG,
             CommitmentH,
@@ -188,12 +188,12 @@ impl TriptychParameters {
         &self.G
     }
 
-    /// Get the group generator `H` from these [`TriptychParameters`].
+    /// Get the group generator `G1` from these [`TriptychParameters`].
     ///
     /// This is the generator used for defining auxiliary verification keys.
     #[allow(non_snake_case)]
-    pub fn get_H(&self) -> &RistrettoPoint {
-        &self.H
+    pub fn get_G1(&self) -> &RistrettoPoint {
+        &self.G1
     }
 
     /// Get the group generator `U` from these [`TriptychParameters`].

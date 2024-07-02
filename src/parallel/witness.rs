@@ -111,6 +111,6 @@ impl TriptychWitness {
 
     /// Compute the auxiliary verification key for the [`TriptychWitness`] signing key.
     pub fn compute_auxiliary_verification_key(&self) -> RistrettoPoint {
-        self.r1 * self.params.get_H()
+        self.r1 * self.params.get_G1()
     }
 }

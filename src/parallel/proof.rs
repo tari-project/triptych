@@ -204,7 +204,7 @@ impl TriptychProof {
         if M_l != r * params.get_G() {
             return Err(ProofError::InvalidParameter);
         }
-        if M1_l - offset != r1 * params.get_H() {
+        if M1_l - offset != r1 * params.get_G1() {
             return Err(ProofError::InvalidParameter);
         }
         if &(r * J) != params.get_U() {
@@ -356,7 +356,7 @@ impl TriptychProof {
             .enumerate()
             .map(|(j, rho1)| {
                 let minus_offset = -offset;
-                let X_points = M1.iter().chain(once(params.get_H())).chain(once(&minus_offset));
+                let X_points = M1.iter().chain(once(params.get_G1())).chain(once(&minus_offset));
                 let p_sum: Scalar = p.iter().map(|p| &p[j]).sum();
                 let X_scalars = p.iter().map(|p| &p[j]).chain(once(rho1)).chain(once(&p_sum));
 
@@ -646,7 +646,7 @@ impl TriptychProof {
                     .chain(once(s.get_offset()))
             })
             .chain(once(params.get_G()))
-            .chain(once(params.get_H()))
+            .chain(once(params.get_G1()))
             .chain(params.get_CommitmentG().iter())
             .chain(once(params.get_CommitmentH()))
             .chain(M.iter())
@@ -1068,7 +1068,7 @@ mod test {
             M[witness.get_l() as usize] = witness.compute_verification_key();
 
             let r_offset = Scalar::random(rng);
-            offsets.push(r_offset * params.get_H());
+            offsets.push(r_offset * params.get_G1());
             M1[witness.get_l() as usize] = witness.compute_auxiliary_verification_key() + offsets.last().unwrap();
         }
         let input_set = Arc::new(TriptychInputSet::new(&M, &M1).unwrap());
