@@ -18,7 +18,7 @@ use crate::{util::OperationTiming, Transcript, TRANSCRIPT_HASH_BYTES};
 /// Public parameters used for generating and verifying Triptych proofs.
 ///
 /// Parameters require a base and exponent that define the size of verification key vectors, as well as group generators
-/// `G`, `H`, and `U` required by the protocol. You can either use [`TriptychParameters::new`] to have these generators
+/// `G`, `G1`, and `U` required by the protocol. You can either use [`TriptychParameters::new`] to have these generators
 /// defined securely for you, or use [`TriptychParameters::new_with_generators`] if your use case requires specific
 /// values for these.
 #[allow(non_snake_case)]
