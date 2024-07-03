@@ -7,6 +7,8 @@ description = "An experimental Rust implementation of the Triptych zero-knowledg
 readme = "README.md"
 license = "BSD-3-Clause"
 categories = ["cryptography"]
+documentation = "https://docs.rs/triptych"
+repository = "https://github.com/tari-project/triptych"
 
 [dependencies]
 blake3 = { version = "1.5.1", default-features = false }
