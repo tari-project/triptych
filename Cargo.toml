@@ -1,6 +1,6 @@
 [package]
 name = "triptych"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["The Tari Project"]
 edition = "2021"
 description = "An experimental Rust implementation of the Triptych zero-knowledge proving system"
