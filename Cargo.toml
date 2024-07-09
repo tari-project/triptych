@@ -29,10 +29,14 @@ rand_chacha = { version = "0.3.1", default-features = false }
 
 [features]
 default = ["rand", "std"]
+# Adds proof serialization and deserialization via [`borsh`](https://crates.io/crates/borsh)
 borsh = ["dep:borsh"]
+# Adds additional prover functionality that supplies a cryptographically-secure random number generator
 rand = ["rand_core/getrandom"]
+# Adds proof serialization and deserialization via [`serde`](https://crates.io/crates/serde)
 serde = ["dep:serde", "curve25519-dalek/serde", "zeroize/serde"]
-std = ["blake3/std", "itertools/use_std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "subtle/std", "zeroize/std"]
+# Adds corresponding dependency features
+std = ["blake3/std", "borsh?/std", "itertools/use_std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "subtle/std", "zeroize/std"]
 
 [[bench]]
 name = "triptych"
