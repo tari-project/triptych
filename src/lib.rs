@@ -37,6 +37,7 @@
 //! The implementation keeps dependencies to a minimum, and is `no_std` friendly.
 //!
 //! There are several features that are enabled by default:
+//! - `borsh`: adds proof serialization and deserialization via `borsh`
 //! - `rand`: adds additional prover functionality that supplies a cryptographically-secure random number generator
 //! - `serde`: adds proof serialization and deserialization via `serde`
 //! - `std`: adds corresponding dependency features
@@ -46,6 +47,7 @@
 //! You can examine performance using the benchmarks: either `cargo bench` or `cargo +nightly bench`.
 //!
 //! Proofs support a custom serialization format designed to be efficient and canonical.
+//! This is used for `borsh` serialization and deserialization, or can be accessed directly.
 //! This functionality has an associated fuzzer that can be run using a nightly compiler: `cargo +nightly fuzz run
 //! proofs`.
 //!

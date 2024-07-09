@@ -4,6 +4,8 @@
 use alloc::{vec, vec::Vec};
 use core::{iter::once, slice, slice::ChunksExact};
 
+#[cfg(feature = "borsh")]
+use borsh::{io, BorshDeserialize, BorshSerialize};
 use curve25519_dalek::{
     ristretto::CompressedRistretto,
     traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
@@ -1001,6 +1003,23 @@ impl TriptychProof {
     }
 }
 
+#[cfg(feature = "borsh")]
+impl BorshSerialize for TriptychProof {
+    fn serialize<W: borsh::io::Write>(&self, writer: &mut W) -> borsh::io::Result<()> {
+        BorshSerialize::serialize(&self.to_bytes(), writer)
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for TriptychProof {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let bytes: Vec<u8> = BorshDeserialize::deserialize_reader(reader)?;
+
+        TriptychProof::from_bytes(&bytes)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid Triptych proof"))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use alloc::{sync::Arc, vec::Vec};
@@ -1174,6 +1193,30 @@ mod test {
 
         // Deserialize the proof
         let deserialized = TriptychProof::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, proof);
+    }
+
+    #[test]
+    #[cfg(feature = "borsh")]
+    #[allow(non_snake_case, non_upper_case_globals)]
+    fn test_borsh() {
+        // Generate data
+        const n: u32 = 2;
+        const m: u32 = 4;
+        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
+
+        // Generate and verify a proof
+        let proof =
+            TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+                .unwrap();
+        assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
+
+        // Serialize the proof
+        let serialized = borsh::to_vec(&proof).unwrap();
+
+        // Deserialize the proof
+        let deserialized: TriptychProof = borsh::from_slice(&serialized).unwrap();
         assert_eq!(deserialized, proof);
     }
 
