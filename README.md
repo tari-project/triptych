@@ -35,7 +35,7 @@ The implementation keeps dependencies to a minimum, and is `no_std` friendly.
 There are several features available.
 
 | Feature | Default? | Description |
-| :--- | --- | :--- |
+| :--- | :---: | :--- |
 | `borsh` | | Adds proof serialization and deserialization via [`borsh`](https://crates.io/crates/borsh) |
 | `serde` | | Adds proof serialization and deserialization via [`serde`](https://crates.io/crates/serde) |
 | `rand` | ✓ | Adds additional prover functionality that supplies a cryptographically-secure random number generator |
