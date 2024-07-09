@@ -12,6 +12,7 @@ repository = "https://github.com/tari-project/triptych"
 
 [dependencies]
 blake3 = { version = "1.5.1", default-features = false }
+borsh = { version = "1.5.1", optional = true, default-features = false }
 crypto-bigint = { version = "0.5.5", default-features = false }
 curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "digest", "rand_core", "zeroize"] }
 itertools = { version = "0.12.1", default-features = false }
@@ -27,7 +28,8 @@ criterion = { version = "0.5.1", default-features = false, features = ["cargo_be
 rand_chacha = { version = "0.3.1", default-features = false }
 
 [features]
-default = ["rand", "serde", "std"]
+default = ["borsh", "rand", "serde", "std"]
+borsh = ["dep:borsh"]
 rand = ["rand_core/getrandom"]
 serde = ["dep:serde", "curve25519-dalek/serde", "zeroize/serde"]
 std = ["blake3/std", "itertools/use_std", "merlin/std", "rand_core/std", "serde?/std", "snafu/std", "subtle/std", "zeroize/std"]
