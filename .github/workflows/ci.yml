@@ -30,11 +30,20 @@ jobs:
         run: cargo install cargo-lints
       - name: Lints
         run: cargo lints clippy --all-targets --all-features
-  check:
+  check-stable:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check (no features)
+        run: cargo check --all-targets --no-default-features
+      - name: Check (all features)
+        run: cargo check --all-targets --all-features
+  check-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
       - name: Check (no features)
         run: cargo check --all-targets --no-default-features
       - name: Check (all features)
