@@ -86,7 +86,6 @@
 //! let witness = TriptychWitness::random(&params, &mut rng);
 //!
 //! // Generate an input set of random verification keys, placing ours at the chosen index
-//! // This is `Arc`-wrapped to facilitate efficient reuse!
 //! let M = (0..params.get_N())
 //!     .map(|i| {
 //!         if i == witness.get_l() {
@@ -96,7 +95,7 @@
 //!         }
 //!     })
 //!     .collect::<Vec<RistrettoPoint>>();
-//! let input_set = Arc::new(TriptychInputSet::new(&M).unwrap());
+//! let input_set = TriptychInputSet::new(&M).unwrap();
 //!
 //! // Generate the statement, which includes the verification key vector and linking tag
 //! let J = witness.compute_linking_tag();

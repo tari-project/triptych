@@ -15,7 +15,7 @@ use crate::{Transcript, TriptychParameters, TRANSCRIPT_HASH_BYTES};
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TriptychInputSet {
-    M: Vec<RistrettoPoint>,
+    M: Arc<Vec<RistrettoPoint>>,
     hash: Vec<u8>,
 }
 
@@ -74,7 +74,10 @@ impl TriptychInputSet {
         let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
         transcript.challenge_bytes(b"hash", &mut hash);
 
-        Ok(Self { M: M.to_vec(), hash })
+        Ok(Self {
+            M: Arc::new(M.to_vec()),
+            hash,
+        })
     }
 
     /// Get the verification keys for this [`TriptychInputSet`].
@@ -96,7 +99,7 @@ impl TriptychInputSet {
 #[derive(Clone, Eq, PartialEq)]
 pub struct TriptychStatement {
     params: Arc<TriptychParameters>,
-    input_set: Arc<TriptychInputSet>,
+    input_set: TriptychInputSet,
     J: RistrettoPoint,
     hash: Vec<u8>,
 }
@@ -127,7 +130,7 @@ impl TriptychStatement {
     #[allow(non_snake_case)]
     pub fn new(
         params: &Arc<TriptychParameters>,
-        input_set: &Arc<TriptychInputSet>,
+        input_set: &TriptychInputSet,
         J: &RistrettoPoint,
     ) -> Result<Self, StatementError> {
         // Check that the input vector is valid against the parameters
@@ -161,7 +164,7 @@ impl TriptychStatement {
     }
 
     /// Get the input set for this [`TriptychStatement`].
-    pub fn get_input_set(&self) -> &Arc<TriptychInputSet> {
+    pub fn get_input_set(&self) -> &TriptychInputSet {
         &self.input_set
     }
 

@@ -15,8 +15,8 @@ use crate::{parallel::TriptychParameters, Transcript, TRANSCRIPT_HASH_BYTES};
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TriptychInputSet {
-    M: Vec<RistrettoPoint>,
-    M1: Vec<RistrettoPoint>,
+    M: Arc<Vec<RistrettoPoint>>,
+    M1: Arc<Vec<RistrettoPoint>>,
     hash: Vec<u8>,
 }
 
@@ -99,8 +99,8 @@ impl TriptychInputSet {
         transcript.challenge_bytes(b"hash", &mut hash);
 
         Ok(Self {
-            M: M.to_vec(),
-            M1: M1.to_vec(),
+            M: Arc::new(M.to_vec()),
+            M1: Arc::new(M1.to_vec()),
             hash,
         })
     }
@@ -130,7 +130,7 @@ impl TriptychInputSet {
 #[derive(Clone, Eq, PartialEq)]
 pub struct TriptychStatement {
     params: Arc<TriptychParameters>,
-    input_set: Arc<TriptychInputSet>,
+    input_set: TriptychInputSet,
     offset: RistrettoPoint,
     J: RistrettoPoint,
     hash: Vec<u8>,
@@ -162,7 +162,7 @@ impl TriptychStatement {
     #[allow(non_snake_case)]
     pub fn new(
         params: &Arc<TriptychParameters>,
-        input_set: &Arc<TriptychInputSet>,
+        input_set: &TriptychInputSet,
         offset: &RistrettoPoint,
         J: &RistrettoPoint,
     ) -> Result<Self, StatementError> {
@@ -208,7 +208,7 @@ impl TriptychStatement {
     }
 
     /// Get the input set for this [`TriptychStatement`].
-    pub fn get_input_set(&self) -> &Arc<TriptychInputSet> {
+    pub fn get_input_set(&self) -> &TriptychInputSet {
         &self.input_set
     }
 
