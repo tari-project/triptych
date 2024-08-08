@@ -66,9 +66,8 @@ mod test {
         let witness = TriptychWitness::new(&params, index, &signing_key, &(commitment_mask - offset_mask)).unwrap();
 
         // We can also set up the input set and statement
-        // The input set is `Arc`-wrapped since it's likely it could be reused
         // The linkable ring signature also comes equipped with a linking tag; the library can compute it for us
-        let input_set = Arc::new(TriptychInputSet::new(&output_keys, &value_commitments).unwrap());
+        let input_set = TriptychInputSet::new(&output_keys, &value_commitments).unwrap();
         let statement = TriptychStatement::new(&params, &input_set, &offset, &witness.compute_linking_tag()).unwrap();
 
         // The proof needs a transcript associated to it

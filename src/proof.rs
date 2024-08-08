@@ -998,7 +998,7 @@ mod test {
         for witness in &witnesses {
             M[witness.get_l() as usize] = witness.compute_verification_key();
         }
-        let input_set = Arc::new(TriptychInputSet::new(&M).unwrap());
+        let input_set = TriptychInputSet::new(&M).unwrap();
 
         // Generate statements
         let mut statements = Vec::with_capacity(b);
@@ -1282,7 +1282,7 @@ mod test {
         let mut M = statements[0].get_input_set().get_keys().to_vec();
         let index = ((witnesses[0].get_l() + 1) % witnesses[0].get_params().get_N()) as usize;
         M[index] = RistrettoPoint::random(&mut rng);
-        let evil_input_set = Arc::new(TriptychInputSet::new(&M).unwrap());
+        let evil_input_set = TriptychInputSet::new(&M).unwrap();
         let evil_statement =
             TriptychStatement::new(statements[0].get_params(), &evil_input_set, statements[0].get_J()).unwrap();
 
