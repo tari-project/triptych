@@ -98,7 +98,7 @@ impl TriptychInputSet {
 #[allow(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
 pub struct TriptychStatement {
-    params: Arc<TriptychParameters>,
+    params: TriptychParameters,
     input_set: TriptychInputSet,
     J: RistrettoPoint,
     hash: Vec<u8>,
@@ -129,7 +129,7 @@ impl TriptychStatement {
     /// otherwise provided externally.
     #[allow(non_snake_case)]
     pub fn new(
-        params: &Arc<TriptychParameters>,
+        params: &TriptychParameters,
         input_set: &TriptychInputSet,
         J: &RistrettoPoint,
     ) -> Result<Self, StatementError> {
@@ -159,7 +159,7 @@ impl TriptychStatement {
     }
 
     /// Get the parameters for this [`TriptychStatement`].
-    pub fn get_params(&self) -> &Arc<TriptychParameters> {
+    pub fn get_params(&self) -> &TriptychParameters {
         &self.params
     }
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
-use alloc::{vec, vec::Vec};
+use alloc::{sync::Arc, vec, vec::Vec};
 use core::iter::once;
 
 use blake3::Hasher;
@@ -28,7 +28,7 @@ pub struct TriptychParameters {
     m: u32,
     G: RistrettoPoint,
     U: RistrettoPoint,
-    CommitmentG: Vec<RistrettoPoint>,
+    CommitmentG: Arc<Vec<RistrettoPoint>>,
     CommitmentH: RistrettoPoint,
     hash: Vec<u8>,
 }
@@ -132,7 +132,7 @@ impl TriptychParameters {
             m,
             G: *G,
             U: *U,
-            CommitmentG,
+            CommitmentG: Arc::new(CommitmentG),
             CommitmentH,
             hash,
         })

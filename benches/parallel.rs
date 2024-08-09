@@ -5,9 +5,6 @@
 
 #[macro_use]
 extern crate criterion;
-extern crate alloc;
-
-use alloc::sync::Arc;
 
 use criterion::{BatchSize, Criterion};
 use curve25519_dalek::{RistrettoPoint, Scalar};
@@ -33,7 +30,7 @@ const BATCH_SIZES: [usize; 1] = [2];
 #[allow(non_snake_case)]
 #[allow(clippy::arithmetic_side_effects)]
 fn generate_data<R: CryptoRngCore>(
-    params: &Arc<TriptychParameters>,
+    params: &TriptychParameters,
     b: usize,
     rng: &mut R,
 ) -> (Vec<TriptychWitness>, Vec<TriptychStatement>, Vec<Transcript>) {
@@ -94,7 +91,7 @@ fn generate_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+            let params = TriptychParameters::new(n, m).unwrap();
 
             let label = format!("Generate proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
@@ -125,7 +122,7 @@ fn generate_proof_vartime(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+            let params = TriptychParameters::new(n, m).unwrap();
 
             let label = format!(
                 "Generate proof (variable time): n = {}, m = {} (N = {})",
@@ -161,7 +158,7 @@ fn verify_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+            let params = TriptychParameters::new(n, m).unwrap();
 
             let label = format!("Verify proof: n = {}, m = {} (N = {})", n, m, params.get_N());
             group.bench_function(&label, |b| {
@@ -197,7 +194,7 @@ fn verify_batch_proof(c: &mut Criterion) {
     for n in N_VALUES {
         for m in M_VALUES {
             // Generate parameters
-            let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+            let params = TriptychParameters::new(n, m).unwrap();
 
             for batch in BATCH_SIZES {
                 let label = format!(

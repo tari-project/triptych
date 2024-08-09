@@ -941,7 +941,7 @@ impl BorshDeserialize for TriptychProof {
 
 #[cfg(test)]
 mod test {
-    use alloc::{sync::Arc, vec::Vec};
+    use alloc::vec::Vec;
 
     use curve25519_dalek::{traits::Identity, RistrettoPoint, Scalar};
     use itertools::izip;
@@ -978,7 +978,7 @@ mod test {
         rng: &mut R,
     ) -> (Vec<TriptychWitness>, Vec<TriptychStatement>, Vec<Transcript>) {
         // Generate parameters
-        let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+        let params = TriptychParameters::new(n, m).unwrap();
 
         // Generate witnesses; for this test, we use adjacent indexes for simplicity
         // This means the batch size must not exceed the input set size!

@@ -1,8 +1,6 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
-use alloc::sync::Arc;
-
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use rand_core::CryptoRngCore;
 use snafu::prelude::*;
@@ -18,7 +16,7 @@ use crate::TriptychParameters;
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct TriptychWitness {
     #[zeroize(skip)]
-    params: Arc<TriptychParameters>,
+    params: TriptychParameters,
     l: u32,
     r: Scalar,
 }
@@ -39,7 +37,7 @@ impl TriptychWitness {
     ///
     /// If you'd like a [`TriptychWitness`] generated securely for you, use [`TriptychWitness::random`] instead.
     #[allow(non_snake_case)]
-    pub fn new(params: &Arc<TriptychParameters>, l: u32, r: &Scalar) -> Result<Self, WitnessError> {
+    pub fn new(params: &TriptychParameters, l: u32, r: &Scalar) -> Result<Self, WitnessError> {
         if r == &Scalar::ZERO {
             return Err(WitnessError::InvalidParameter);
         }
@@ -61,7 +59,7 @@ impl TriptychWitness {
     ///
     /// If you'd rather provide your own secret data, use [`TriptychWitness::new`] instead.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn random<R: CryptoRngCore>(params: &Arc<TriptychParameters>, rng: &mut R) -> Self {
+    pub fn random<R: CryptoRngCore>(params: &TriptychParameters, rng: &mut R) -> Self {
         // Generate a random index using wide reduction
         // This can't truncate since `N` is bounded by `u32`
         // It is also defined since `N > 0`
@@ -76,7 +74,7 @@ impl TriptychWitness {
     }
 
     /// Get the [`TriptychParameters`] from this [`TriptychWitness`].
-    pub fn get_params(&self) -> &Arc<TriptychParameters> {
+    pub fn get_params(&self) -> &TriptychParameters {
         &self.params
     }
 

@@ -67,9 +67,6 @@
 //! ```
 //! # #[cfg(feature = "rand")]
 //! # {
-//! # extern crate alloc;
-//! use alloc::sync::Arc;
-//!
 //! use curve25519_dalek::RistrettoPoint;
 //! use rand_core::OsRng;
 //! use triptych::*;
@@ -77,10 +74,9 @@
 //! let mut rng = OsRng;
 //!
 //! // Generate parameters
-//! // This is `Arc`-wrapped to facilitate efficient reuse!
 //! const n: u32 = 2;
 //! const m: u32 = 3;
-//! let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+//! let params = TriptychParameters::new(n, m).unwrap();
 //!
 //! // Generate a random witness, which includes the signing key and an index where it will appear
 //! let witness = TriptychWitness::random(&params, &mut rng);
