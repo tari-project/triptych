@@ -10,8 +10,6 @@
 //! This example shows how to use Triptych.
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
     use curve25519_dalek::{RistrettoPoint, Scalar};
     use merlin::Transcript;
     use rand_chacha::ChaCha12Rng;
@@ -25,10 +23,9 @@ mod test {
         let mut rng = ChaCha12Rng::seed_from_u64(8675309);
 
         // Parameters that will define the number of outputs used in the proof: 2^4 == 16
-        // The parameters are `Arc`-wrapped since it's likely they could be reused
         let n = 2;
         let m = 4;
-        let params = Arc::new(TriptychParameters::new(n, m).unwrap());
+        let params = TriptychParameters::new(n, m).unwrap();
         let number_outputs = params.get_N();
 
         // Value commitments use the Triptych `G` generator for masks, and need another component for values
