@@ -93,7 +93,7 @@ impl TriptychProof {
     /// You must also supply a [`Transcript`] `transcript`.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
-    #[cfg(feature = "rand")]
+    #[cfg(all(feature = "rand", feature = "hazmat"))]
     pub fn prove_vartime(
         witness: &TriptychWitness,
         statement: &TriptychStatement,
@@ -113,6 +113,7 @@ impl TriptychProof {
     /// You must also supply a [`CryptoRngCore`] random number generator `rng` and a [`Transcript`] `transcript`.
     ///
     /// This function specifically avoids constant-time operations for efficiency.
+    #[cfg(feature = "hazmat")]
     pub fn prove_with_rng_vartime<R: CryptoRngCore>(
         witness: &TriptychWitness,
         statement: &TriptychStatement,
@@ -1051,7 +1052,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "rand")]
+    #[cfg(all(feature = "rand", feature = "hazmat"))]
     #[allow(non_snake_case, non_upper_case_globals)]
     fn test_prove_verify_vartime() {
         // Generate data
@@ -1066,6 +1067,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "hazmat")]
     #[allow(non_snake_case, non_upper_case_globals)]
     fn test_prove_verify_vartime_with_rng() {
         // Generate data
@@ -1091,9 +1093,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof =
-            TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                .unwrap();
+        let proof = TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
 
         // Serialize the proof
@@ -1115,9 +1116,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate and verify a proof
-        let proof =
-            TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                .unwrap();
+        let proof = TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
         assert!(proof.verify(&statements[0], &mut transcripts[0]).is_ok());
 
         // Serialize the proof
@@ -1140,7 +1140,7 @@ mod test {
 
         // Generate the proofs
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-            .map(|(w, s, t)| TriptychProof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+            .map(|(w, s, t)| TriptychProof::prove_with_rng(w, s, &mut rng, t).unwrap())
             .collect::<Vec<TriptychProof>>();
 
         // Verify the batch with and without blame
@@ -1169,7 +1169,7 @@ mod test {
 
         // Generate the proofs
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-            .map(|(w, s, t)| TriptychProof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+            .map(|(w, s, t)| TriptychProof::prove_with_rng(w, s, &mut rng, t).unwrap())
             .collect::<Vec<TriptychProof>>();
 
         // Manipulate a transcript so the corresponding proof is invalid
@@ -1193,7 +1193,7 @@ mod test {
 
             // Generate the proofs
             let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-                .map(|(w, s, t)| TriptychProof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+                .map(|(w, s, t)| TriptychProof::prove_with_rng(w, s, &mut rng, t).unwrap())
                 .collect::<Vec<TriptychProof>>();
 
             // Iteratively manipulate each transcript to make the corresponding proof invalid
@@ -1227,7 +1227,7 @@ mod test {
 
         // Generate the proofs
         let proofs = izip!(witnesses.iter(), statements.iter(), transcripts.clone().iter_mut())
-            .map(|(w, s, t)| TriptychProof::prove_with_rng_vartime(w, s, &mut rng, t).unwrap())
+            .map(|(w, s, t)| TriptychProof::prove_with_rng(w, s, &mut rng, t).unwrap())
             .collect::<Vec<TriptychProof>>();
 
         // Manipulate some of the transcripts to make the corresponding proofs invalid
@@ -1254,8 +1254,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof = TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0])
-            .unwrap();
+        let proof =
+            TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0]).unwrap();
 
         // Generate a modified transcript
         let mut evil_transcript = Transcript::new(b"Evil transcript");
@@ -1274,9 +1274,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof =
-            TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                .unwrap();
+        let proof = TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
 
         // Generate a statement with a modified input set
         let mut M = statements[0].get_input_set().get_keys().to_vec();
@@ -1300,9 +1299,8 @@ mod test {
         let (witnesses, statements, mut transcripts) = generate_data(n, m, 1, &mut rng);
 
         // Generate a proof
-        let proof =
-            TriptychProof::prove_with_rng_vartime(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
-                .unwrap();
+        let proof = TriptychProof::prove_with_rng(&witnesses[0], &statements[0], &mut rng, &mut transcripts[0].clone())
+            .unwrap();
 
         // Generate a statement with a modified linking tag
         let evil_statement = TriptychStatement::new(
