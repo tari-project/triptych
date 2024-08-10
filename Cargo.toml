@@ -31,6 +31,8 @@ rand_chacha = { version = "0.3.1", default-features = false }
 default = ["rand", "std"]
 # Adds proof serialization and deserialization via [`borsh`](https://crates.io/crates/borsh)
 borsh = ["dep:borsh"]
+# Adds variable-time prover functionality that should only be used if you absolutely know what you're doing
+hazmat = []
 # Adds additional prover functionality that supplies a cryptographically-secure random number generator
 rand = ["rand_core/getrandom"]
 # Adds proof serialization and deserialization via [`serde`](https://crates.io/crates/serde)
@@ -41,10 +43,12 @@ std = ["blake3/std", "borsh?/std", "itertools/use_std", "merlin/std", "rand_core
 [[bench]]
 name = "triptych"
 harness = false
+required-features = ["hazmat"]
 
 [[bench]]
 name = "parallel"
 harness = false
+required-features = ["hazmat"]
 
 [[example]]
 name = "ringct"

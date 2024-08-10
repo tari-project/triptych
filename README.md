@@ -37,13 +37,14 @@ There are several features available.
 | Feature | Default? | Description |
 | :--- | :---: | :--- |
 | `borsh` | | Adds proof serialization and deserialization via [`borsh`](https://crates.io/crates/borsh) |
-| `serde` | | Adds proof serialization and deserialization via [`serde`](https://crates.io/crates/serde) |
+| `hazmat` | | Adds variable-time prover functionality that should only be used if you absolutely know what you're doing |
 | `rand` | ✓ | Adds additional prover functionality that supplies a cryptographically-secure random number generator |
+| `serde` | | Adds proof serialization and deserialization via [`serde`](https://crates.io/crates/serde) |
 | `std` | ✓ | Adds corresponding dependency features |
 
 The underlying [curve library](https://crates.io/crates/curve25519-dalek) chooses an arithmetic backend based on CPU feature detection.
 Using a nightly compiler broadens the backend set, and may provide better performance.
-You can examine performance using the benchmarks: either `cargo bench` or `cargo +nightly bench`.
+You can examine performance using the benchmarks: either `cargo bench --all-features` or `cargo +nightly bench --all-features`.
 
 Proofs support a custom serialization format designed to be efficient and canonical.
 This is used for `borsh` serialization and deserialization, or can be accessed directly.
