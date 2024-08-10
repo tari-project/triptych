@@ -118,7 +118,7 @@ pub use merlin::Transcript;
 
 pub(crate) const TRANSCRIPT_HASH_BYTES: usize = 32;
 
-/// Iterated arbitrary-base Gray code functionaity.
+/// Iterated arbitrary-base Gray code functionality.
 pub(crate) mod gray;
 /// Public parameters used for generating and verifying Triptych proofs.
 pub mod parameters;
