@@ -45,11 +45,15 @@ impl TriptychInputSet {
 
         // We cannot have the vector be too long
         if unpadded_size > params.get_N() as usize {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "unpadded size exceeded `N`",
+            });
         }
 
         // Get the last element, which also ensures the vector is nonempty
-        let last = M.last().ok_or(StatementError::InvalidParameter)?;
+        let last = M
+            .last()
+            .ok_or(StatementError::InvalidParameter { reason: "`M` is empty" })?;
 
         // Pad the vector with the last element
         let mut M_padded = M.to_vec();
@@ -62,7 +66,9 @@ impl TriptychInputSet {
     #[allow(non_snake_case)]
     fn new_internal(M: &[RistrettoPoint], unpadded_size: usize) -> Result<Self, StatementError> {
         // Ensure the verification key vector length doesn't overflow
-        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter)?;
+        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter {
+            reason: "unpadded size overflowed `u32`",
+        })?;
 
         // Use Merlin for the transcript hash
         let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
@@ -108,8 +114,11 @@ pub struct TriptychStatement {
 #[derive(Debug, Snafu)]
 pub enum StatementError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter {
+        /// The reason for the parameter error.
+        reason: &'static str,
+    },
 }
 
 impl TriptychStatement {
@@ -135,10 +144,14 @@ impl TriptychStatement {
     ) -> Result<Self, StatementError> {
         // Check that the input vector is valid against the parameters
         if input_set.get_keys().len() != params.get_N() as usize {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "input vector length was not `N`",
+            });
         }
         if input_set.get_keys().contains(&RistrettoPoint::identity()) {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "input vector contained the identity point",
+            });
         }
 
         // Use Merlin for the transcript hash

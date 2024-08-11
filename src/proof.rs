@@ -53,8 +53,11 @@ pub struct TriptychProof {
 #[derive(Debug, Snafu)]
 pub enum ProofError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter {
+        /// The reason for the parameter error.
+        reason: &'static str,
+    },
     /// A transcript challenge was invalid.
     #[snafu(display("A transcript challenge was invalid"))]
     InvalidChallenge,
@@ -174,7 +177,9 @@ impl TriptychProof {
     ) -> Result<Self, ProofError> {
         // Check that the witness and statement have identical parameters
         if witness.get_params() != statement.get_params() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "witness and statement parameters did not match",
+            });
         }
 
         // Extract values for convenience
@@ -199,10 +204,12 @@ impl TriptychProof {
         }
 
         if M_l != r * params.get_G() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "`M[l] != r * G`",
+            });
         }
         if &(r * J) != params.get_U() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter { reason: "`r * J != U`" });
         }
 
         // Set up the transcript
@@ -222,16 +229,23 @@ impl TriptychProof {
         }
         let A = params
             .commit_matrix(&a, &r_A, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "unable to compute `A`",
+            })?;
 
         // Compute the `B` matrix commitment
         let r_B = Scalar::random(transcript.as_mut_rng());
         let l_decomposed = match timing {
             OperationTiming::Constant => {
-                GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter)?
+                GrayIterator::decompose(params.get_n(), params.get_m(), l).ok_or(ProofError::InvalidParameter {
+                    reason: "`l` decomposition failed",
+                })?
             },
-            OperationTiming::Variable => GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l)
-                .ok_or(ProofError::InvalidParameter)?,
+            OperationTiming::Variable => GrayIterator::decompose_vartime(params.get_n(), params.get_m(), l).ok_or(
+                ProofError::InvalidParameter {
+                    reason: "`l` decomposition failed",
+                },
+            )?,
         };
         let sigma = (0..params.get_m())
             .map(|j| {
@@ -242,7 +256,9 @@ impl TriptychProof {
             .collect::<Vec<Vec<Scalar>>>();
         let B = params
             .commit_matrix(&sigma, &r_B, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "unable to compute `B`",
+            })?;
 
         // Compute the `C` matrix commitment
         let two = Scalar::from(2u32);
@@ -256,7 +272,9 @@ impl TriptychProof {
             .collect::<Vec<Vec<Scalar>>>();
         let C = params
             .commit_matrix(&a_sigma, &r_C, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "unable to compute `C`",
+            })?;
 
         // Compute the `D` matrix commitment
         let r_D = Scalar::random(transcript.as_mut_rng());
@@ -269,7 +287,9 @@ impl TriptychProof {
             .collect::<Vec<Vec<Scalar>>>();
         let D = params
             .commit_matrix(&a_square, &r_D, timing)
-            .map_err(|_| ProofError::InvalidParameter)?;
+            .map_err(|_| ProofError::InvalidParameter {
+                reason: "unable to compute `D`",
+            })?;
 
         // Random masks
         let rho = Zeroizing::new(
@@ -282,7 +302,9 @@ impl TriptychProof {
         let mut p = Vec::<Vec<Scalar>>::with_capacity(params.get_N() as usize);
         let mut k_decomposed = vec![0; params.get_m() as usize];
         for (gray_index, _, gray_new) in
-            GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?
+            GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter {
+                reason: "coefficient decomposition failed",
+            })?
         {
             k_decomposed[gray_index] = gray_new;
 
@@ -291,7 +313,9 @@ impl TriptychProof {
             coefficients.resize(
                 (params.get_m() as usize)
                     .checked_add(1)
-                    .ok_or(ProofError::InvalidParameter)?,
+                    .ok_or(ProofError::InvalidParameter {
+                        reason: "polynomial degree overflowed",
+                    })?,
                 Scalar::ZERO,
             );
             coefficients[0] = a[0][k_decomposed[0] as usize];
@@ -526,10 +550,14 @@ impl TriptychProof {
     ) -> Result<(), ProofError> {
         // Check that we have the same number of statements, proofs, and transcripts
         if statements.len() != proofs.len() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "number of statements and proof does not match",
+            });
         }
         if statements.len() != transcripts.len() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "number of statements and transcripts does not match",
+            });
         }
 
         // An empty batch is considered trivially valid
@@ -540,12 +568,16 @@ impl TriptychProof {
 
         // Each statement must use the same input set (checked using the hash for efficiency)
         if !statements.iter().map(|s| s.get_input_set().get_hash()).all_equal() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "statement input sets do not match",
+            });
         }
 
         // Each statement must use the same parameters (checked using the hash for efficiency)
         if !statements.iter().map(|s| s.get_params().get_hash()).all_equal() {
-            return Err(ProofError::InvalidParameter);
+            return Err(ProofError::InvalidParameter {
+                reason: "statement parameters do not match",
+            });
         }
 
         // Extract common values for convenience
@@ -555,23 +587,37 @@ impl TriptychProof {
         // Check that all proof semantics are valid for the statement
         for proof in proofs {
             if proof.X.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "proof `X` vector length was not `m`",
+                });
             }
             if proof.Y.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "proof `Y` vector length was not `m`",
+                });
             }
             if proof.f.len() != params.get_m() as usize {
-                return Err(ProofError::InvalidParameter);
+                return Err(ProofError::InvalidParameter {
+                    reason: "proof `f` matrix did not have `m` rows",
+                });
             }
             for f_row in &proof.f {
-                if f_row.len() != params.get_n().checked_sub(1).ok_or(ProofError::InvalidParameter)? as usize {
-                    return Err(ProofError::InvalidParameter);
+                if f_row.len() !=
+                    params.get_n().checked_sub(1).ok_or(ProofError::InvalidParameter {
+                        reason: "proof `f` matrix column count overflowed",
+                    })? as usize
+                {
+                    return Err(ProofError::InvalidParameter {
+                        reason: "proof `f` matrix did not have `n - 1` columns",
+                    });
                 }
             }
         }
 
         // Determine the size of the final check vector, which must not overflow `usize`
-        let batch_size = u32::try_from(proofs.len()).map_err(|_| ProofError::InvalidParameter)?;
+        let batch_size = u32::try_from(proofs.len()).map_err(|_| ProofError::InvalidParameter {
+            reason: "batch size overflowed `u32`",
+        })?;
 
         // This is unlikely to overflow; even if it does, the only effect is unnecessary reallocation
         #[allow(clippy::arithmetic_side_effects)]
@@ -587,7 +633,9 @@ impl TriptychProof {
                 + 2 * params.get_m() // X, Y
             ),
         )
-        .map_err(|_| ProofError::InvalidParameter)?;
+        .map_err(|_| ProofError::InvalidParameter {
+            reason: "multiscalar multiplication size overflowed `usize`",
+        })?;
 
         // Set up the point vector for the final check
         let points = proofs
@@ -656,7 +704,9 @@ impl TriptychProof {
             // Check that `f` does not contain zero, which breaks batch inversion
             for f_row in &f {
                 if f_row.contains(&Scalar::ZERO) {
-                    return Err(ProofError::InvalidParameter);
+                    return Err(ProofError::InvalidParameter {
+                        reason: "proof `f` matrix contained 0",
+                    });
                 }
             }
 
@@ -717,7 +767,9 @@ impl TriptychProof {
             // Set up the initial `f` product and Gray iterator
             let mut f_product = f.iter().map(|f_row| f_row[0]).product::<Scalar>();
             let gray_iterator =
-                GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter)?;
+                GrayIterator::new(params.get_n(), params.get_m()).ok_or(ProofError::InvalidParameter {
+                    reason: "coefficient decomposition failed",
+                })?;
 
             // Invert each element of `f` for efficiency
             let mut f_inverse_flat = f.iter().flatten().copied().collect::<Vec<Scalar>>();

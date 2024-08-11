@@ -88,7 +88,9 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
         let xi = Scalar::from_bytes_mod_order_wide(&xi_bytes);
 
         // Get powers of the challenge and confirm they are nonzero
-        let mut xi_powers = Vec::with_capacity(m.checked_add(1).ok_or(ProofError::InvalidParameter)?);
+        let mut xi_powers = Vec::with_capacity(m.checked_add(1).ok_or(ProofError::InvalidParameter {
+            reason: "challenge power count overflowed `usize`",
+        })?);
         let mut xi_power = Scalar::ONE;
         for _ in 0..=m {
             if xi_power == Scalar::ZERO {

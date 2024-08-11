@@ -26,8 +26,11 @@ pub struct TriptychWitness {
 #[derive(Debug, Snafu)]
 pub enum WitnessError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter {
+        /// The reason for the parameter error.
+        reason: &'static str,
+    },
 }
 
 impl TriptychWitness {
@@ -39,11 +42,14 @@ impl TriptychWitness {
     /// If you'd like a [`TriptychWitness`] generated securely for you, use [`TriptychWitness::random`] instead.
     #[allow(non_snake_case)]
     pub fn new(params: &TriptychParameters, l: u32, r: &Scalar, r1: &Scalar) -> Result<Self, WitnessError> {
-        if r == &Scalar::ZERO || r1 == &Scalar::ZERO {
-            return Err(WitnessError::InvalidParameter);
+        if r == &Scalar::ZERO {
+            return Err(WitnessError::InvalidParameter { reason: "`r == 0`" });
+        }
+        if r1 == &Scalar::ZERO {
+            return Err(WitnessError::InvalidParameter { reason: "`r1 == 0`" });
         }
         if l >= params.get_N() {
-            return Err(WitnessError::InvalidParameter);
+            return Err(WitnessError::InvalidParameter { reason: "`l >= N`" });
         }
 
         Ok(Self {
