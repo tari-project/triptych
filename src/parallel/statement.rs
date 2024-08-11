@@ -6,7 +6,7 @@ use alloc::{sync::Arc, vec, vec::Vec};
 use curve25519_dalek::{traits::Identity, RistrettoPoint};
 use snafu::prelude::*;
 
-use crate::{parallel::TriptychParameters, Transcript, TRANSCRIPT_HASH_BYTES};
+use crate::{domains, parallel::TriptychParameters, Transcript};
 
 /// A Triptych input set.
 ///
@@ -21,11 +21,6 @@ pub struct TriptychInputSet {
 }
 
 impl TriptychInputSet {
-    // Domain separator used for hashing
-    const DOMAIN: &'static str = "Parallel Triptych input set";
-    // Version identifier used for hashing
-    const VERSION: u64 = 0;
-
     /// Generate a new [`TriptychInputSet`] from a slice `M` of verification keys and slice `M1` of auxiliary
     /// verification keys.
     #[allow(non_snake_case)]
@@ -98,8 +93,8 @@ impl TriptychInputSet {
         })?;
 
         // Use Merlin for the transcript hash
-        let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
-        transcript.append_u64(b"version", Self::VERSION);
+        let mut transcript = Transcript::new(domains::TRANSCRIPT_PARALLEL_INPUT_SET.as_bytes());
+        transcript.append_u64(b"version", domains::VERSION);
         transcript.append_message(b"unpadded_size", &unpadded_size.to_le_bytes());
         for item in M {
             transcript.append_message(b"M", item.compress().as_bytes());
@@ -107,7 +102,7 @@ impl TriptychInputSet {
         for item in M1 {
             transcript.append_message(b"M1", item.compress().as_bytes());
         }
-        let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
+        let mut hash = vec![0u8; domains::TRANSCRIPT_HASH_BYTES];
         transcript.challenge_bytes(b"hash", &mut hash);
 
         Ok(Self {
@@ -160,11 +155,6 @@ pub enum StatementError {
 }
 
 impl TriptychStatement {
-    // Domain separator used for hashing
-    const DOMAIN: &'static str = "Parallel Triptych statement";
-    // Version identifier used for hashing
-    const VERSION: u64 = 0;
-
     /// Generate a new [`TriptychStatement`].
     ///
     /// The [`TriptychInputSet`] `input_set` must have a verification key vector whose size matches that specified by
@@ -205,13 +195,13 @@ impl TriptychStatement {
         }
 
         // Use Merlin for the transcript hash
-        let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
-        transcript.append_u64(b"version", Self::VERSION);
+        let mut transcript = Transcript::new(domains::TRANSCRIPT_PARALLEL_STATEMENT.as_bytes());
+        transcript.append_u64(b"version", domains::VERSION);
         transcript.append_message(b"params", params.get_hash());
         transcript.append_message(b"input_set", input_set.get_hash());
         transcript.append_message(b"offset", offset.compress().as_bytes());
         transcript.append_message(b"J", J.compress().as_bytes());
-        let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
+        let mut hash = vec![0u8; domains::TRANSCRIPT_HASH_BYTES];
         transcript.challenge_bytes(b"hash", &mut hash);
 
         Ok(Self {

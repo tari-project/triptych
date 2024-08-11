@@ -21,6 +21,7 @@ use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
 use crate::{
+    domains,
     gray::GrayIterator,
     transcript::ProofTranscript,
     util::{delta, NullRng, OperationTiming},
@@ -668,7 +669,8 @@ impl TriptychProof {
         let mut U_scalar = Scalar::ZERO;
 
         // Set up a transcript generator for use in weighting
-        let mut transcript_weights = Transcript::new(b"Triptych verifier weights");
+        let mut transcript_weights = Transcript::new(domains::TRANSCRIPT_VERIFIER_WEIGHTS.as_bytes());
+        transcript_weights.append_u64(b"version", domains::VERSION);
 
         let mut null_rng = NullRng;
 
