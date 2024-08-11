@@ -37,8 +37,11 @@ pub struct TriptychParameters {
 #[derive(Debug, Snafu)]
 pub enum ParameterError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter {
+        /// The reason for the parameter error.
+        reason: &'static str,
+    },
 }
 
 impl TriptychParameters {
@@ -83,13 +86,18 @@ impl TriptychParameters {
     #[allow(non_snake_case)]
     pub fn new_with_generators(n: u32, m: u32, G: &RistrettoPoint, U: &RistrettoPoint) -> Result<Self, ParameterError> {
         // These bounds are required by the protocol
-        if n < 2 || m < 2 {
-            return Err(ParameterError::InvalidParameter);
+        if n < 2 {
+            return Err(ParameterError::InvalidParameter { reason: "`n < 2`" });
+        }
+        if m < 2 {
+            return Err(ParameterError::InvalidParameter { reason: "`m < 2`" });
         }
 
         // Check that the parameters don't overflow `u32`
         if n.checked_pow(m).is_none() {
-            return Err(ParameterError::InvalidParameter);
+            return Err(ParameterError::InvalidParameter {
+                reason: "`n**m` overflowed `u32`",
+            });
         }
 
         // Use `BLAKE3` to generate `CommitmentH`
@@ -106,7 +114,9 @@ impl TriptychParameters {
         hasher.update(&m.to_le_bytes());
         let mut hasher_xof = hasher.finalize_xof();
         let mut CommitmentG_bytes = [0u8; 64];
-        let CommitmentG = (0..n.checked_mul(m).ok_or(ParameterError::InvalidParameter)?)
+        let CommitmentG = (0..n.checked_mul(m).ok_or(ParameterError::InvalidParameter {
+            reason: "`n*m` overflowed `u32`",
+        })?)
             .map(|_| {
                 hasher_xof.fill(&mut CommitmentG_bytes);
                 RistrettoPoint::from_uniform_bytes(&CommitmentG_bytes)
@@ -149,8 +159,15 @@ impl TriptychParameters {
         timing: OperationTiming,
     ) -> Result<RistrettoPoint, ParameterError> {
         // Check that the matrix dimensions are valid
-        if matrix.len() != (self.m as usize) || matrix.iter().any(|m| m.len() != (self.n as usize)) {
-            return Err(ParameterError::InvalidParameter);
+        if matrix.len() != (self.m as usize) {
+            return Err(ParameterError::InvalidParameter {
+                reason: "matrix did not have `m` rows",
+            });
+        }
+        if matrix.iter().any(|m| m.len() != (self.n as usize)) {
+            return Err(ParameterError::InvalidParameter {
+                reason: "matrix did not have `n` columns",
+            });
         }
 
         // Flatten before evaluating the commitment

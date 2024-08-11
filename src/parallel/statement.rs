@@ -32,7 +32,9 @@ impl TriptychInputSet {
     pub fn new(M: &[RistrettoPoint], M1: &[RistrettoPoint]) -> Result<Self, StatementError> {
         // The verification key vectors must be the same length
         if M.len() != M1.len() {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "`M` and `M1` did not have matching lengths",
+            });
         }
 
         Self::new_internal(M, M1, M.len())
@@ -55,7 +57,9 @@ impl TriptychInputSet {
     ) -> Result<Self, StatementError> {
         // The vectors must be the same length
         if M.len() != M1.len() {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "`M` and `M1` did not have matching lengths",
+            });
         }
 
         // Get the unpadded size
@@ -63,12 +67,18 @@ impl TriptychInputSet {
 
         // We cannot have the vectors be too long
         if unpadded_size > params.get_N() as usize {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "unpadded size exceeded `N`",
+            });
         }
 
         // Get the last elements, which also ensures the vectors are nonempty
-        let last = M.last().ok_or(StatementError::InvalidParameter)?;
-        let last1 = M1.last().ok_or(StatementError::InvalidParameter)?;
+        let last = M.last().ok_or(StatementError::InvalidParameter {
+            reason: "`M` was empty",
+        })?;
+        let last1 = M1.last().ok_or(StatementError::InvalidParameter {
+            reason: "`M1` was empty",
+        })?;
 
         // Pad the vectors with the corresponding last elements
         let mut M_padded = M.to_vec();
@@ -83,7 +93,9 @@ impl TriptychInputSet {
     #[allow(non_snake_case)]
     fn new_internal(M: &[RistrettoPoint], M1: &[RistrettoPoint], unpadded_size: usize) -> Result<Self, StatementError> {
         // Ensure the verification key vector lengths don't overflow
-        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter)?;
+        let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter {
+            reason: "unpadded size overflowed `u32`",
+        })?;
 
         // Use Merlin for the transcript hash
         let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
@@ -140,8 +152,11 @@ pub struct TriptychStatement {
 #[derive(Debug, Snafu)]
 pub enum StatementError {
     /// An invalid parameter was provided.
-    #[snafu(display("An invalid parameter was provided"))]
-    InvalidParameter,
+    #[snafu(display("An invalid parameter was provided: {reason}"))]
+    InvalidParameter {
+        /// The reason for the parameter error.
+        reason: &'static str,
+    },
 }
 
 impl TriptychStatement {
@@ -168,10 +183,14 @@ impl TriptychStatement {
     ) -> Result<Self, StatementError> {
         // Check that the input vectors are valid against the parameters
         if input_set.get_keys().len() != params.get_N() as usize {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "input vector size was not `N`",
+            });
         }
         if input_set.get_keys().contains(&RistrettoPoint::identity()) {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "input vector contained the identity point",
+            });
         }
         if input_set
             .get_auxiliary_keys()
@@ -180,7 +199,9 @@ impl TriptychStatement {
             .collect::<Vec<RistrettoPoint>>()
             .contains(&RistrettoPoint::identity())
         {
-            return Err(StatementError::InvalidParameter);
+            return Err(StatementError::InvalidParameter {
+                reason: "input vector contained the identity point",
+            });
         }
 
         // Use Merlin for the transcript hash
