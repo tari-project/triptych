@@ -13,7 +13,7 @@ use curve25519_dalek::{
 };
 use snafu::prelude::*;
 
-use crate::{util::OperationTiming, Transcript, TRANSCRIPT_HASH_BYTES};
+use crate::{domains, util::OperationTiming, Transcript};
 
 /// Public parameters used for generating and verifying Triptych proofs.
 ///
@@ -46,11 +46,6 @@ pub enum ParameterError {
 }
 
 impl TriptychParameters {
-    // Domain separator used for hashing
-    const DOMAIN: &'static str = "Parallel Triptych parameters";
-    // Version identifier used for hashing
-    const VERSION: u64 = 0;
-
     /// Generate new [`TriptychParameters`] for Triptych proofs.
     ///
     /// The base `n > 1` and exponent `m > 1` define the size of verification key vectors, so it must be the case that
@@ -66,14 +61,16 @@ impl TriptychParameters {
         // Use `BLAKE3` to generate `G1`
         let mut G1_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update(b"Triptych G1");
+        hasher.update(domains::POINT_G1.as_bytes());
+        hasher.update(&domains::VERSION.to_le_bytes());
         hasher.finalize_xof().fill(&mut G1_bytes);
         let G1 = RistrettoPoint::from_uniform_bytes(&G1_bytes);
 
         // Use `BLAKE3` to generate `U`
         let mut U_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update(b"Triptych U");
+        hasher.update(domains::POINT_U.as_bytes());
+        hasher.update(&domains::VERSION.to_le_bytes());
         hasher.finalize_xof().fill(&mut U_bytes);
         let U = RistrettoPoint::from_uniform_bytes(&U_bytes);
 
@@ -118,13 +115,15 @@ impl TriptychParameters {
         // Use `BLAKE3` to generate `CommitmentH`
         let mut CommitmentH_bytes = [0u8; 64];
         let mut hasher = Hasher::new();
-        hasher.update(b"Triptych CommitmentH");
+        hasher.update(domains::POINT_COMMITMENT_H.as_bytes());
+        hasher.update(&domains::VERSION.to_le_bytes());
         hasher.finalize_xof().fill(&mut CommitmentH_bytes);
         let CommitmentH = RistrettoPoint::from_uniform_bytes(&CommitmentH_bytes);
 
         // Use `BLAKE3` for the commitment matrix generators
         let mut hasher = Hasher::new();
-        hasher.update(b"Triptych CommitmentG");
+        hasher.update(domains::POINT_COMMITMENT_G.as_bytes());
+        hasher.update(&domains::VERSION.to_le_bytes());
         hasher.update(&n.to_le_bytes());
         hasher.update(&m.to_le_bytes());
         let mut hasher_xof = hasher.finalize_xof();
@@ -139,8 +138,8 @@ impl TriptychParameters {
             .collect::<Vec<RistrettoPoint>>();
 
         // Use Merlin for the transcript hash
-        let mut transcript = Transcript::new(Self::DOMAIN.as_bytes());
-        transcript.append_u64(b"version", Self::VERSION);
+        let mut transcript = Transcript::new(domains::TRANSCRIPT_PARALLEL_PARAMETERS.as_bytes());
+        transcript.append_u64(b"version", domains::VERSION);
         transcript.append_message(b"n", &n.to_le_bytes());
         transcript.append_message(b"m", &m.to_le_bytes());
         transcript.append_message(b"G", G.compress().as_bytes());
@@ -150,7 +149,7 @@ impl TriptychParameters {
             transcript.append_message(b"CommitmentG", item.compress().as_bytes());
         }
         transcript.append_message(b"CommitmentH", CommitmentH.compress().as_bytes());
-        let mut hash = vec![0u8; TRANSCRIPT_HASH_BYTES];
+        let mut hash = vec![0u8; domains::TRANSCRIPT_HASH_BYTES];
         transcript.challenge_bytes(b"hash", &mut hash);
 
         Ok(TriptychParameters {

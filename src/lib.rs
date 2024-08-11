@@ -116,8 +116,6 @@ extern crate alloc;
 
 pub use merlin::Transcript;
 
-pub(crate) const TRANSCRIPT_HASH_BYTES: usize = 32;
-
 /// Iterated arbitrary-base Gray code functionality.
 pub(crate) mod gray;
 /// Public parameters used for generating and verifying Triptych proofs.
@@ -139,3 +137,32 @@ pub use witness::TriptychWitness;
 
 /// Parallel Triptych functionality.
 pub mod parallel;
+
+/// Domain separators used for hashing operations
+pub(crate) mod domains {
+    // Version
+    pub(crate) const VERSION: u64 = 0;
+
+    // Number of bytes in a transcript hash
+    pub(crate) const TRANSCRIPT_HASH_BYTES: usize = 32;
+
+    // Parameters
+    pub(crate) const TRANSCRIPT_PARAMETERS: &str = "Triptych parameters";
+    pub(crate) const TRANSCRIPT_PARALLEL_PARAMETERS: &str = "Parallel Triptych parameters";
+    pub(crate) const POINT_G1: &str = "Triptych G1";
+    pub(crate) const POINT_U: &str = "Triptych U";
+    pub(crate) const POINT_COMMITMENT_G: &str = "Triptych CommitmentG";
+    pub(crate) const POINT_COMMITMENT_H: &str = "Triptych CommitmentH";
+
+    // Statement
+    pub(crate) const TRANSCRIPT_INPUT_SET: &str = "Triptych input set";
+    pub(crate) const TRANSCRIPT_PARALLEL_INPUT_SET: &str = "Parallel Triptych input set";
+    pub(crate) const TRANSCRIPT_STATEMENT: &str = "Triptych statement";
+    pub(crate) const TRANSCRIPT_PARALLEL_STATEMENT: &str = "Parallel Triptych statement";
+
+    // Proof
+    pub(crate) const TRANSCRIPT_PROOF: &str = "Triptych proof";
+    pub(crate) const TRANSCRIPT_PARALLEL_PROOF: &str = "Parallel Triptych proof";
+    pub(crate) const TRANSCRIPT_VERIFIER_WEIGHTS: &str = "Triptych verifier weights";
+    pub(crate) const TRANSCRIPT_PARALLEL_VERIFIER_WEIGHTS: &str = "Parallel Triptych verifier weights";
+}

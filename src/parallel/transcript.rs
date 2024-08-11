@@ -8,6 +8,7 @@ use merlin::TranscriptRng;
 use rand_core::CryptoRngCore;
 
 use crate::{
+    domains,
     parallel::{proof::ProofError, TriptychParameters, TriptychStatement, TriptychWitness},
     Transcript,
 };
@@ -21,11 +22,6 @@ pub(crate) struct ProofTranscript<'a, R: CryptoRngCore> {
 }
 
 impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
-    // Domain separator used for hashing
-    const DOMAIN: &'static str = "Parallel Triptych proof";
-    // Version identifier used for hashing
-    const VERSION: u64 = 0;
-
     /// Initialize a transcript.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
@@ -34,8 +30,8 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
         witness: Option<&'a TriptychWitness>,
     ) -> Self {
         // Update the transcript
-        transcript.append_message(b"dom-sep", Self::DOMAIN.as_bytes());
-        transcript.append_u64(b"version", Self::VERSION);
+        transcript.append_message(b"dom-sep", domains::TRANSCRIPT_PARALLEL_PROOF.as_bytes());
+        transcript.append_u64(b"version", domains::VERSION);
         transcript.append_message(b"statement", statement.get_hash());
 
         // Set up the transcript generator
