@@ -30,7 +30,7 @@ mod test {
 
         // Value commitments use the Triptych `G` generator for masks, and need another component for values
         // In practice it's essential that `G` and `H` have no efficiently-computable discrete logarithm relationship
-        // For this example, we'll just make it random; in the real world, you'd use a verifiable hash-based construction
+        // For this example, we'll just make it random; in the real world, you'd use a verifiable construction
         let H = RistrettoPoint::random(&mut rng);
 
         // All output verification keys and value commitments (except ours) look random to us, so just make them random!
