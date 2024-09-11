@@ -53,4 +53,5 @@ required-features = ["hazmat"]
 [[example]]
 name = "ringct"
 crate-type = ["staticlib"]
+required-features = ["rand"]
 test = true

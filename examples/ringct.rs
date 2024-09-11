@@ -12,15 +12,14 @@
 mod test {
     use curve25519_dalek::{RistrettoPoint, Scalar};
     use merlin::Transcript;
-    use rand_chacha::ChaCha12Rng;
-    use rand_core::SeedableRng;
+    use rand_core::OsRng;
     use triptych::parallel::*;
 
     #[allow(non_snake_case)]
     #[test]
     fn ringct() {
-        // In practice you should use an actual random number generator; this is just for easier testing
-        let mut rng = ChaCha12Rng::seed_from_u64(8675309);
+        // It's important to use a cryptographically-secure random number generator!
+        let mut rng = OsRng;
 
         // Parameters that will define the number of outputs used in the proof: 2^4 == 16
         let n = 2;
