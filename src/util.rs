@@ -12,7 +12,6 @@ use zeroize::Zeroize;
 
 /// Options for constant- or variable-time operations.
 #[derive(Clone, Copy)]
-#[allow(dead_code)]
 pub(crate) enum OperationTiming {
     /// The operation should attempt to run in constant time
     Constant,

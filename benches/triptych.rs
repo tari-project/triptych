@@ -1,7 +1,7 @@
 // Copyright (c) 2024, The Tari Project
 // SPDX-License-Identifier: BSD-3-Clause
 
-#![allow(missing_docs)]
+#![expect(missing_docs)]
 
 #[macro_use]
 extern crate criterion;
@@ -25,8 +25,8 @@ const M_VALUES: [u32; 4] = [2, 4, 8, 10];
 const BATCH_SIZES: [usize; 1] = [2];
 
 // Generate a batch of witnesses, statements, and transcripts
-#[allow(non_snake_case)]
-#[allow(clippy::arithmetic_side_effects)]
+#[expect(non_snake_case)]
+#[expect(clippy::arithmetic_side_effects)]
 fn generate_data<R: CryptoRngCore>(
     params: &TriptychParameters,
     b: usize,
@@ -72,8 +72,6 @@ fn generate_data<R: CryptoRngCore>(
     (witnesses, statements, transcripts)
 }
 
-#[allow(non_snake_case)]
-#[allow(non_upper_case_globals)]
 fn generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("generate_proof");
     let mut rng = ChaCha12Rng::seed_from_u64(8675309);
@@ -103,8 +101,6 @@ fn generate_proof(c: &mut Criterion) {
     group.finish();
 }
 
-#[allow(non_snake_case)]
-#[allow(non_upper_case_globals)]
 fn generate_proof_vartime(c: &mut Criterion) {
     let mut group = c.benchmark_group("generate_proof_vartime");
     let mut rng = ChaCha12Rng::seed_from_u64(8675309);
@@ -139,8 +135,6 @@ fn generate_proof_vartime(c: &mut Criterion) {
     group.finish();
 }
 
-#[allow(non_snake_case)]
-#[allow(non_upper_case_globals)]
 fn verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify_proof");
     let mut rng = ChaCha12Rng::seed_from_u64(8675309);
@@ -175,8 +169,6 @@ fn verify_proof(c: &mut Criterion) {
     group.finish();
 }
 
-#[allow(non_snake_case)]
-#[allow(non_upper_case_globals)]
 fn verify_batch_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify_batch_proof");
     let mut rng = ChaCha12Rng::seed_from_u64(8675309);

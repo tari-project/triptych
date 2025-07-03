@@ -40,7 +40,6 @@ impl TriptychWitness {
     /// [`TriptychParameters`] `params`. If any of these conditions is not met, returns a [`WitnessError`].
     ///
     /// If you'd like a [`TriptychWitness`] generated securely for you, use [`TriptychWitness::random`] instead.
-    #[allow(non_snake_case)]
     pub fn new(params: &TriptychParameters, l: u32, r: &Scalar, r1: &Scalar) -> Result<Self, WitnessError> {
         if r == &Scalar::ZERO {
             return Err(WitnessError::InvalidParameter { reason: "`r == 0`" });
@@ -66,12 +65,12 @@ impl TriptychWitness {
     /// This will generate a [`TriptychWitness`] with a cryptographically-secure signing key and random index.
     ///
     /// If you'd rather provide your own secret data, use [`TriptychWitness::new`] instead.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     pub fn random<R: CryptoRngCore>(params: &TriptychParameters, rng: &mut R) -> Self {
         // Generate a random index using wide reduction
         // This can't truncate since `N` is bounded by `u32`
         // It is also defined since `N > 0`
-        #[allow(clippy::arithmetic_side_effects)]
+        #[expect(clippy::arithmetic_side_effects)]
         let l = (rng.as_rngcore().next_u64() % u64::from(params.get_N())) as u32;
 
         Self {
@@ -103,7 +102,6 @@ impl TriptychWitness {
     }
 
     /// Compute the linking tag for the [`TriptychWitness`] signing key.
-    #[allow(non_snake_case)]
     pub fn compute_linking_tag(&self) -> RistrettoPoint {
         *Zeroizing::new(self.r.invert()) * self.params.get_U()
     }

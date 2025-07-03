@@ -12,7 +12,7 @@ use crate::{domains, Transcript, TriptychParameters};
 ///
 /// An input set is constructed from a vector of verification keys.
 /// Internally, it also contains cryptographic hash data to make proofs more efficient.
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TriptychInputSet {
     M: Arc<Vec<RistrettoPoint>>,
@@ -21,7 +21,7 @@ pub struct TriptychInputSet {
 
 impl TriptychInputSet {
     /// Generate a new [`TriptychInputSet`] from a slice `M` of verification keys.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn new(M: &[RistrettoPoint]) -> Result<Self, StatementError> {
         Self::new_internal(M, M.len())
     }
@@ -33,7 +33,7 @@ impl TriptychInputSet {
     /// element. If your use case cannot safely allow this, use [`TriptychInputSet::new`] instead.
     ///
     /// If the verification key vector is empty or longer than specified by `params`, returns a [`StatementError`].
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn new_with_padding(M: &[RistrettoPoint], params: &TriptychParameters) -> Result<Self, StatementError> {
         // Get the unpadded size
         let unpadded_size = M.len();
@@ -58,7 +58,7 @@ impl TriptychInputSet {
     }
 
     // Helper function to do the actual generation
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn new_internal(M: &[RistrettoPoint], unpadded_size: usize) -> Result<Self, StatementError> {
         // Ensure the verification key vector length doesn't overflow
         let unpadded_size = u32::try_from(unpadded_size).map_err(|_| StatementError::InvalidParameter {
@@ -96,7 +96,7 @@ impl TriptychInputSet {
 ///
 /// The statement consists of an [`TriptychInputSet`] of verification keys and a linking tag.
 /// It also contains [`TriptychParameters`] that, among other things, enforce the size of the [`TriptychInputSet`].
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
 pub struct TriptychStatement {
     params: TriptychParameters,
@@ -126,7 +126,7 @@ impl TriptychStatement {
     /// The linking tag `J` is assumed to have been computed from
     /// [`TriptychWitness::compute_linking_tag`](`crate::witness::TriptychWitness::compute_linking_tag`) data or
     /// otherwise provided externally.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn new(
         params: &TriptychParameters,
         input_set: &TriptychInputSet,
@@ -172,7 +172,7 @@ impl TriptychStatement {
     }
 
     /// Get the linking tag for this [`TriptychStatement`].
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn get_J(&self) -> &RistrettoPoint {
         &self.J
     }
@@ -203,7 +203,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn test_padding() {
         // Generate parameters
         let params = TriptychParameters::new(2, 4).unwrap();

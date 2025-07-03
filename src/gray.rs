@@ -7,7 +7,7 @@ use core::num::NonZeroU32;
 use crypto_bigint::{NonZero, U64};
 
 /// An iterator for arbitrary-base Gray codes.
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub(crate) struct GrayIterator {
     N: u32, // base
     M: u32, // number of digits
@@ -24,7 +24,7 @@ impl GrayIterator {
     ///
     /// Operations using this iterator run in variable time, so don't use this for secret data.
     /// If you need to get the Gray code decomposition for a secret value, use `decompose` directly.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn new(N: u32, M: u32) -> Option<Self> {
         // Check inputs
         if N <= 1 || M == 0 {
@@ -45,7 +45,7 @@ impl GrayIterator {
     /// You must provide a valid value `v` based on the supplied parameters `N` and `M`.
     /// If anything goes wrong, returns `None`.
     /// Otherwise, returns the Gray code as a `u32` digit vector.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn decompose_vartime(N: u32, M: u32, mut v: u32) -> Option<Vec<u32>> {
         if N <= 1 || M == 0 {
             return None;
@@ -76,7 +76,7 @@ impl GrayIterator {
     /// You must provide a valid value `v` based on the supplied parameters `N` and `M`.
     /// If anything goes wrong, returns `None`.
     /// Otherwise, returns the Gray code as a `u32` digit vector.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
         if N <= 1 || M == 0 {
             return None;
@@ -126,7 +126,6 @@ impl Iterator for GrayIterator {
     ///
     /// Keep in mind that this does not return the actual Gray code!
     /// You must keep track of that yourself.
-    #[allow(non_snake_case)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.i == 0 {
             self.i = 1;
@@ -163,7 +162,7 @@ mod test {
     use super::*;
 
     #[test]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn test_gray_iterator() {
         // Set up parameters
         let N = 3u32;
@@ -195,7 +194,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn test_gray_iterator_vartime() {
         // Set up parameters
         let N = 3u32;
