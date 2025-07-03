@@ -21,7 +21,7 @@ use crate::{domains, util::OperationTiming, Transcript};
 /// `G`, `G1`, and `U` required by the protocol. You can either use [`TriptychParameters::new`] to have these generators
 /// defined securely for you, or use [`TriptychParameters::new_with_generators`] if your use case requires specific
 /// values for these.
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 #[derive(Clone, Eq, PartialEq)]
 pub struct TriptychParameters {
     n: u32,
@@ -53,7 +53,7 @@ impl TriptychParameters {
     ///
     /// This function produces group generators `G`, `G1` and `U` for you.
     /// If your use case requires specific generators, use [`TriptychParameters::new_with_generators`] instead.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn new(n: u32, m: u32) -> Result<Self, ParameterError> {
         // Use the default base point for `G` (this is arbitrary)
         let G = RISTRETTO_BASEPOINT_POINT;
@@ -89,7 +89,7 @@ impl TriptychParameters {
     ///
     /// The security of these generators cannot be checked by this function.
     /// If you'd rather have the generators securely defined for you, use [`TriptychParameters::new`] instead.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn new_with_generators(
         n: u32,
         m: u32,
@@ -199,7 +199,7 @@ impl TriptychParameters {
     /// Get the group generator `G` from these [`TriptychParameters`].
     ///
     /// This is the generator used for defining verification keys.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn get_G(&self) -> &RistrettoPoint {
         &self.G
     }
@@ -207,7 +207,7 @@ impl TriptychParameters {
     /// Get the group generator `G1` from these [`TriptychParameters`].
     ///
     /// This is the generator used for defining auxiliary verification keys.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn get_G1(&self) -> &RistrettoPoint {
         &self.G1
     }
@@ -215,7 +215,7 @@ impl TriptychParameters {
     /// Get the group generator `U` from these [`TriptychParameters`].
     ///
     /// This is the generator used for defining linking tags.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn get_U(&self) -> &RistrettoPoint {
         &self.U
     }
@@ -237,20 +237,20 @@ impl TriptychParameters {
     /// Get the value `N == n**m` from these [`TriptychParameters`].
     ///
     /// This is the verification key vector size.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn get_N(&self) -> u32 {
         // This is guaranteed not to overflow
         self.n.pow(self.m)
     }
 
     /// Get the value `CommitmentG` from these [`TriptychParameters`].
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn get_CommitmentG(&self) -> &Vec<RistrettoPoint> {
         &self.CommitmentG
     }
 
     /// Get the value `CommitmentH` from these [`TriptychParameters`].
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn get_CommitmentH(&self) -> &RistrettoPoint {
         &self.CommitmentH
     }

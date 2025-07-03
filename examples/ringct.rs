@@ -15,7 +15,7 @@ mod test {
     use rand_core::OsRng;
     use triptych::parallel::*;
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[test]
     fn ringct() {
         // It's important to use a cryptographically-secure random number generator!

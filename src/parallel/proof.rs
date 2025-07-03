@@ -32,7 +32,7 @@ use crate::{
 const SERIALIZED_BYTES: usize = 32;
 
 /// A Triptych proof.
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TriptychProof {
@@ -168,7 +168,7 @@ impl TriptychProof {
     }
 
     /// The actual prover functionality.
-    #[allow(clippy::too_many_lines, non_snake_case)]
+    #[expect(clippy::too_many_lines, non_snake_case)]
     fn prove_internal<R: CryptoRngCore>(
         witness: &TriptychWitness,
         statement: &TriptychStatement,
@@ -485,7 +485,7 @@ impl TriptychProof {
         let mut right = proofs.len();
 
         while left < right {
-            #[allow(clippy::arithmetic_side_effects)]
+            #[expect(clippy::arithmetic_side_effects)]
             let average = left
                 .checked_add(
                     // This cannot underflow since `left < right`
@@ -493,7 +493,7 @@ impl TriptychProof {
                 )
                 .ok_or(ProofError::FailedBatchVerificationWithSingleBlame { index: None })?;
 
-            #[allow(clippy::arithmetic_side_effects)]
+            #[expect(clippy::arithmetic_side_effects)]
             // This cannot underflow since `left < right`
             let mid = if (right - left) % 2 == 0 {
                 average
@@ -583,7 +583,7 @@ impl TriptychProof {
     /// [`TriptychParameters`](`crate::parameters::TriptychParameters`).
     ///
     /// If any of the above requirements are not met, or if any proof is invalid, returns a [`ProofError`].
-    #[allow(clippy::too_many_lines, non_snake_case)]
+    #[expect(clippy::too_many_lines, non_snake_case)]
     pub fn verify_batch(
         statements: &[TriptychStatement],
         proofs: &[TriptychProof],
@@ -667,7 +667,7 @@ impl TriptychProof {
         })?;
 
         // This is unlikely to overflow; even if it does, the only effect is unnecessary reallocation
-        #[allow(clippy::arithmetic_side_effects)]
+        #[expect(clippy::arithmetic_side_effects)]
         let final_size = usize::try_from(
             1 // G
             + 1 // H
@@ -884,10 +884,10 @@ impl TriptychProof {
     }
 
     /// Serialize a [`TriptychProof`] to a canonical byte vector.
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn to_bytes(&self) -> Vec<u8> {
         // This cannot overflow
-        #[allow(clippy::arithmetic_side_effects)]
+        #[expect(clippy::arithmetic_side_effects)]
         let mut result = Vec::with_capacity(
             8 // `n - 1`, `m`
             + SERIALIZED_BYTES * (
@@ -899,9 +899,9 @@ impl TriptychProof {
                 + self.f.len() * self.f[0].len()
             ),
         );
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let n_minus_1 = self.f[0].len() as u32;
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let m = self.f.len() as u32;
         result.extend(n_minus_1.to_le_bytes());
         result.extend(m.to_le_bytes());
@@ -935,7 +935,7 @@ impl TriptychProof {
     /// Deserialize a [`TriptychProof`] from a canonical byte slice.
     ///
     /// If `bytes` does not represent a canonical encoding, returns a [`ProofError`].
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProofError> {
         // Helper to parse a `u32` from a `u8` iterator
         let parse_u32 = |iter: &mut dyn Iterator<Item = &u8>| {
@@ -1111,8 +1111,8 @@ mod test {
     }
 
     // Generate a batch of witnesses, statements, and transcripts
-    #[allow(non_snake_case)]
-    #[allow(clippy::arithmetic_side_effects)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::arithmetic_side_effects)]
     fn generate_data<R: CryptoRngCore>(
         n: u32,
         m: u32,
@@ -1173,7 +1173,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "rand")]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify() {
         // Generate data
         const n: u32 = 2;
@@ -1187,7 +1187,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_with_rng() {
         // Generate data
         const n: u32 = 2;
@@ -1203,7 +1203,7 @@ mod test {
 
     #[test]
     #[cfg(all(feature = "rand", feature = "hazmat"))]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_vartime() {
         // Generate data
         const n: u32 = 2;
@@ -1218,7 +1218,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "hazmat")]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_vartime_with_rng() {
         // Generate data
         const n: u32 = 2;
@@ -1234,7 +1234,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_serialize_deserialize() {
         // Generate data
         const n: u32 = 2;
@@ -1257,7 +1257,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "borsh")]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_borsh() {
         // Generate data
         const n: u32 = 2;
@@ -1279,7 +1279,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_batch() {
         // Generate data
         const n: u32 = 2;
@@ -1308,7 +1308,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_invalid_batch() {
         // Generate data
         const n: u32 = 2;
@@ -1330,7 +1330,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_invalid_batch_single_blame() {
         // Generate data
         const n: u32 = 2;
@@ -1364,7 +1364,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_prove_verify_invalid_batch_full_blame() {
         // Generate data
         const n: u32 = 2;
@@ -1395,7 +1395,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_evil_message() {
         // Generate data
         const n: u32 = 2;
@@ -1415,7 +1415,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_snake_case, non_upper_case_globals)]
     fn test_evil_input_set() {
         // Generate data
         const n: u32 = 2;
@@ -1446,7 +1446,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_snake_case, non_upper_case_globals)]
     fn test_evil_input_set_auxiliary() {
         // Generate data
         const n: u32 = 2;
@@ -1477,7 +1477,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_evil_linking_tag() {
         // Generate data
         const n: u32 = 2;
@@ -1503,7 +1503,7 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case, non_upper_case_globals)]
+    #[expect(non_upper_case_globals)]
     fn test_evil_offset() {
         // Generate data
         const n: u32 = 2;

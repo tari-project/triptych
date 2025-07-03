@@ -42,7 +42,7 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
     }
 
     /// Run the Fiat-Shamir commitment phase and produce challenge powers
-    #[allow(non_snake_case, clippy::too_many_arguments)]
+    #[expect(non_snake_case, clippy::too_many_arguments)]
     pub(crate) fn commit(
         &mut self,
         params: &TriptychParameters,
@@ -93,7 +93,7 @@ impl<'a, R: CryptoRngCore> ProofTranscript<'a, R> {
     }
 
     /// Run the Fiat-Shamir response phase
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub(crate) fn response(mut self, f: &Vec<Vec<Scalar>>, z_A: &Scalar, z_C: &Scalar, z: &Scalar) -> TranscriptRng {
         // Update the transcript
         for f_row in f {
