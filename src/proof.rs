@@ -685,7 +685,9 @@ impl TriptychProof {
 
             // Run the Fiat-Shamir response phase to get the transcript generator and weight
             let mut transcript_rng = transcript.response(&proof.f, &proof.z_A, &proof.z_C, &proof.z);
-            transcript_weights.append_u64(b"proof", transcript_rng.as_rngcore().next_u64());
+            let mut transcript_bytes = [0u8; 32];
+            transcript_rng.as_rngcore().fill_bytes(&mut transcript_bytes);
+            transcript_weights.append_message(b"proof", &transcript_bytes);
         }
 
         // Finalize the weighting transcript into a pseudorandom number generator
