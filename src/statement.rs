@@ -143,6 +143,11 @@ impl TriptychStatement {
                 reason: "input vector contained the identity point",
             });
         }
+        if J == &RistrettoPoint::identity() {
+            return Err(StatementError::InvalidParameter {
+                reason: "linking tag was the identity point",
+            });
+        }
 
         // Use Merlin for the transcript hash
         let mut transcript = Transcript::new(domains::TRANSCRIPT_STATEMENT.as_bytes());
@@ -235,5 +240,23 @@ mod test {
             TriptychInputSet::new_with_padding(&M, &params).unwrap().get_hash(),
             TriptychInputSet::new(&M_padded).unwrap().get_hash()
         )
+    }
+
+    #[test]
+    fn test_invalid_generators_and_linking_tag() {
+        use curve25519_dalek::{constants::RISTRETTO_BASEPOINT_POINT, traits::Identity};
+
+        use crate::TriptychStatement;
+
+        let g = RISTRETTO_BASEPOINT_POINT;
+        let id = RistrettoPoint::identity();
+        assert!(TriptychParameters::new_with_generators(2, 2, &id, &g).is_err());
+        assert!(TriptychParameters::new_with_generators(2, 2, &g, &id).is_err());
+        assert!(TriptychParameters::new_with_generators(2, 2, &g, &g).is_err());
+
+        let params = TriptychParameters::new(2, 2).unwrap();
+        let keys = random_vector(params.get_N() as usize);
+        let input_set = TriptychInputSet::new(&keys).unwrap();
+        assert!(TriptychStatement::new(&params, &input_set, &id).is_err());
     }
 }

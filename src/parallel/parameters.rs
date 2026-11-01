@@ -7,7 +7,7 @@ use core::iter::once;
 use blake3::Hasher;
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_POINT,
-    traits::{MultiscalarMul, VartimeMultiscalarMul},
+    traits::{Identity, MultiscalarMul, VartimeMultiscalarMul},
     RistrettoPoint,
     Scalar,
 };
@@ -109,6 +109,18 @@ impl TriptychParameters {
         if n.checked_pow(m).is_none() {
             return Err(ParameterError::InvalidParameter {
                 reason: "`n**m` overflowed `u32`",
+            });
+        }
+
+        // Check that the generators are not the identity point and are pairwise distinct
+        if G == &RistrettoPoint::identity() || G1 == &RistrettoPoint::identity() || U == &RistrettoPoint::identity() {
+            return Err(ParameterError::InvalidParameter {
+                reason: "generator was the identity point",
+            });
+        }
+        if G == G1 || G == U || G1 == U {
+            return Err(ParameterError::InvalidParameter {
+                reason: "generators `G`, `G1`, and `U` were not distinct",
             });
         }
 

@@ -72,12 +72,24 @@ impl TriptychWitness {
         // It is also defined since `N > 0`
         #[expect(clippy::arithmetic_side_effects)]
         let l = (rng.as_rngcore().next_u64() % u64::from(params.get_N())) as u32;
+        let r = loop {
+            let candidate = Scalar::random(rng);
+            if candidate != Scalar::ZERO {
+                break candidate;
+            }
+        };
+        let r1 = loop {
+            let candidate = Scalar::random(rng);
+            if candidate != Scalar::ZERO {
+                break candidate;
+            }
+        };
 
         Self {
             params: params.clone(),
             l,
-            r: Scalar::random(rng),
-            r1: Scalar::random(rng),
+            r,
+            r1,
         }
     }
 
