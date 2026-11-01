@@ -983,16 +983,32 @@ impl TriptychProof {
 
         // Parse the encoded vector dimensions and check that `n, m > 1` and that they do not overflow
         let n_minus_1 = parse_u32(&mut iter)?;
-        if n_minus_1.checked_add(1).ok_or(ProofError::FailedDeserialization)? < 2 {
+        let n = n_minus_1.checked_add(1).ok_or(ProofError::FailedDeserialization)?;
+        if n < 2 {
             return Err(ProofError::FailedDeserialization);
         }
         let m = parse_u32(&mut iter)?;
         if m < 2 {
             return Err(ProofError::FailedDeserialization);
         }
+        if n.checked_pow(m).is_none() {
+            return Err(ProofError::FailedDeserialization);
+        }
 
         // The rest of the serialization is of encoded proof elements
         let mut chunks = iter.as_slice().chunks_exact(SERIALIZED_BYTES);
+        if !chunks.remainder().is_empty() {
+            return Err(ProofError::FailedDeserialization);
+        }
+
+        // Verify the slice contains the exact number of elements before allocating vectors
+        let expected_elements = 8usize
+            .checked_add((m as usize).checked_mul(3).ok_or(ProofError::FailedDeserialization)?)
+            .and_then(|acc| acc.checked_add((m as usize).checked_mul(n_minus_1 as usize)?))
+            .ok_or(ProofError::FailedDeserialization)?;
+        if chunks.len() != expected_elements {
+            return Err(ProofError::FailedDeserialization);
+        }
 
         // Extract the fixed proof elements
         let A = parse_point(&mut chunks)?;
@@ -1025,9 +1041,6 @@ impl TriptychProof {
             .collect::<Result<Vec<Vec<Scalar>>, ProofError>>()?;
 
         // Ensure no data is left over
-        if !chunks.remainder().is_empty() {
-            return Err(ProofError::FailedDeserialization);
-        }
         if chunks.next().is_some() {
             return Err(ProofError::FailedDeserialization);
         }
@@ -1526,5 +1539,19 @@ mod test {
 
         // Attempt to verify the proof against the new statement, which should fail
         assert!(proof.verify(&evil_statement, &mut transcripts[0]).is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_rejects_oversized_dimensions_without_oom() {
+        // Craft a small buffer claiming `n - 1 = 1` (`n = 2`) and `m = u32::MAX`
+        let mut evil_bytes = Vec::new();
+        evil_bytes.extend_from_slice(&1u32.to_le_bytes());
+        evil_bytes.extend_from_slice(&u32::MAX.to_le_bytes());
+        evil_bytes.resize(264, 0u8);
+
+        assert!(matches!(
+            TriptychProof::from_bytes(&evil_bytes),
+            Err(ProofError::FailedDeserialization)
+        ));
     }
 }

@@ -50,6 +50,9 @@ impl GrayIterator {
         if N <= 1 || M == 0 {
             return None;
         }
+        if v >= N.checked_pow(M)? {
+            return None;
+        }
 
         // Get a base-`N` decomposition
         let mut base_N = Vec::with_capacity(M as usize);
@@ -79,6 +82,9 @@ impl GrayIterator {
     #[expect(non_snake_case)]
     pub(crate) fn decompose(N: u32, M: u32, v: u32) -> Option<Vec<u32>> {
         if N <= 1 || M == 0 {
+            return None;
+        }
+        if v >= N.checked_pow(M)? {
             return None;
         }
 
@@ -223,5 +229,9 @@ mod test {
             assert!(!digits_seen.contains(&digits));
             digits_seen.push(digits.clone());
         }
+
+        // Out-of-range values must be rejected
+        assert!(GrayIterator::decompose(N, K, N.pow(K)).is_none());
+        assert!(GrayIterator::decompose_vartime(N, K, N.pow(K)).is_none());
     }
 }
